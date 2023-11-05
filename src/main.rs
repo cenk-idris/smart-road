@@ -16,6 +16,7 @@ fn conf() -> Conf {
     }
 }
 
+#[derive(Clone)]
 struct Car {
     car_rect: Rect,
     current_direction: String,
@@ -27,6 +28,7 @@ struct Car {
 
 impl Car {
     fn new() -> Self {
+        let random_speed = gen_range(1., 2.);
         let behavior_code_list = ["RD", "RL", "RU"];
         let randomized_behavior_code = gen_range(0, 3);
         let spawning = match behavior_code_list[randomized_behavior_code] {
@@ -40,8 +42,8 @@ impl Car {
             car_rect: Rect::new(spawning.x, spawning.y, CAR_SIZE.x, CAR_SIZE.y),
             radar: Rect::new(spawning.x - RADAR_SIZE.x, spawning.y, RADAR_SIZE.x, RADAR_SIZE.y),
             current_direction: "West".to_string(),
-            randomized_initial_speed: gen_range(1., 2.),
-            current_speed: 0.,
+            randomized_initial_speed: random_speed,
+            current_speed: random_speed,
         }
     }
 
@@ -55,14 +57,30 @@ impl Car {
 
     fn move_one_step(&mut self) {
         match &*self.current_direction {
-            "West" => self.car_rect.x -= self.randomized_initial_speed,
-            "North" => self.car_rect.y -= self.randomized_initial_speed,
+            "West" => self.car_rect.x -= self.current_speed,
+
             _ => {}
         };
     }
 
-    fn update_radar(&mut self) {
+    fn update_radar(&mut self, car_index: usize, temp_cars: &Vec<Car>) {
+        match &*self.current_direction {
+            "West" => {
+                // Update radar rectangle
+                self.radar.x = self.car_rect.x - RADAR_SIZE.x;
+                // Reposition the radar when intersection occur
+                for (other_index, other_car) in temp_cars.iter().enumerate() {
+                    if car_index != other_index && self.radar.intersect(other_car.car_rect).is_some() {
+                        println!("Intersection Occurred");
+                        self.radar.x = other_car.car_rect.x + other_car.car_rect.w;
+                    }
+                    // Update radar width
+                    self.radar.w = vec2(self.radar.x, self.radar.y).distance(vec2(self.car_rect.x, self.car_rect.y)).min(43.);
+                }
 
+            }
+            _ => {}
+        }
     }
 
     fn draw_all_components(&self) {
@@ -71,8 +89,8 @@ impl Car {
         draw_rectangle(
             self.radar.x,
             self.radar.y,
-            RADAR_SIZE.x,
-            RADAR_SIZE.y,
+            self.radar.w,
+            self.radar.h,
             Color::new(1.0, 0.0, 0.0, 0.1)
         );
 
@@ -115,7 +133,29 @@ async fn main() {
 
         // a method call, moves the cars one step based on their direction
         cars.iter_mut().for_each(|car| car.move_one_step());
+
         // a method call to update radar positions after moving the car
+
+        let temp_cars = cars.clone();
+        for (car_index, car) in cars.iter_mut().enumerate() {
+            car.update_radar(car_index, &temp_cars);
+        }
+
+        for car in &mut cars {
+            match car.radar.w {
+                radar_width if radar_width <= 4. => car.current_speed = 0.,
+                radar_width if radar_width <= 10. => {
+                    car.current_speed = car.randomized_initial_speed * 0.25;
+                }
+                radar_width if radar_width <= 20. => {
+                    car.current_speed = car.randomized_initial_speed * 0.5;
+                }
+                radar_width if radar_width <= 39. => {
+                    car.current_speed = car.randomized_initial_speed * 0.75
+                }
+                _ => car.current_speed = car.randomized_initial_speed,
+            }
+        }
 
 
 
