@@ -112,63 +112,76 @@ impl Car {
 #[macroquad::main(conf)]
 async fn main() {
     // Initial game variables
+    let mut is_paused = false;
     let cross_road: Texture2D = load_texture("assets/cross-road.png").await.unwrap();
     let mut cars: Vec<Car> = Vec::new();
 
     // GAME LOOP
+
     loop {
-
-        // 1. PROCESS INPUT
-        // Handles any user input that
-        // has happened since the last call
-        if is_key_pressed(Right) {
-            let possible_new_car = Car::new();
-            possible_new_car.spawn_if_can(&mut cars);
+        if is_key_pressed(KeyCode::P) {
+            is_paused = !is_paused;
         }
 
+        if is_paused {
+            draw_text("Game Paused - Press P to continue", 350., 600., 40.0, WHITE);
+        } else {
 
-        // 2. UPDATE THE STAGE
-        // Advances the game simulation one step
-        // It runs the AI and game mechanics
+            // 1. PROCESS INPUT
+            // Handles any user input that
+            // has happened since the last call
 
-        // a method call, moves the cars one step based on their direction
-        cars.iter_mut().for_each(|car| car.move_one_step());
 
-        // a method call to update radar positions after moving the car
-
-        let temp_cars = cars.clone();
-        for (car_index, car) in cars.iter_mut().enumerate() {
-            car.update_radar(car_index, &temp_cars);
-        }
-
-        for car in &mut cars {
-            match car.radar.w {
-                radar_width if radar_width <= 4. => car.current_speed = 0.,
-                radar_width if radar_width <= 10. => {
-                    car.current_speed = car.randomized_initial_speed * 0.25;
-                }
-                radar_width if radar_width <= 20. => {
-                    car.current_speed = car.randomized_initial_speed * 0.5;
-                }
-                radar_width if radar_width <= 39. => {
-                    car.current_speed = car.randomized_initial_speed * 0.75
-                }
-                _ => car.current_speed = car.randomized_initial_speed,
+            if is_key_pressed(Right) {
+                let possible_new_car = Car::new();
+                possible_new_car.spawn_if_can(&mut cars);
             }
+
+
+            // 2. UPDATE THE STAGE
+            // Advances the game simulation one step
+            // It runs the AI and game mechanics
+
+            // a method call, moves the cars one step based on their direction
+            cars.iter_mut().for_each(|car| car.move_one_step());
+
+            // a method call to update radar positions after moving the car
+
+            let temp_cars = cars.clone();
+            for (car_index, car) in cars.iter_mut().enumerate() {
+                car.update_radar(car_index, &temp_cars);
+            }
+
+            for car in &mut cars {
+                match car.radar.w {
+                    radar_width if radar_width <= 4. => car.current_speed = 0.,
+                    radar_width if radar_width <= 10. => {
+                        car.current_speed = car.randomized_initial_speed * 0.25;
+                    }
+                    radar_width if radar_width <= 20. => {
+                        car.current_speed = car.randomized_initial_speed * 0.5;
+                    }
+                    radar_width if radar_width <= 39. => {
+                        car.current_speed = car.randomized_initial_speed * 0.75
+                    }
+                    _ => car.current_speed = car.randomized_initial_speed,
+                }
+            }
+
+
+
+
+
+            // 3. RENDER / DRAW
+            // Draws the game on the screen
+
+            // Draw the cross roads aka the background
+            draw_texture(&cross_road, 0., 0., WHITE);
+
+            //Draw the car_rect
+            cars.iter().for_each(|car| car.draw_all_components() );
         }
 
-
-
-
-
-        // 3. RENDER / DRAW
-        // Draws the game on the screen
-
-        // Draw the cross roads aka the background
-        draw_texture(&cross_road, 0., 0., WHITE);
-
-        //Draw the car_rect
-        cars.iter().for_each(|car| car.draw_all_components() );
 
         next_frame().await;
     }
