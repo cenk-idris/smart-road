@@ -1,4 +1,3 @@
-// testing branch update
 use macroquad::{prelude::*, rand::gen_range};
 use macroquad::input::KeyCode::Right;
 
@@ -21,6 +20,11 @@ fn conf() -> Conf {
         ..Default::default()
     }
 }
+#[derive(Clone)]
+struct Dimensions {
+    long_edge: f32,
+    short_edge: f32,
+}
 
 #[derive(Clone)]
 struct Car {
@@ -33,6 +37,8 @@ struct Car {
     has_turned: bool,
     behavior_code: String,
     waiting_flag: bool,
+    car_size: Dimensions,
+    radar_size: Dimensions,
 
 }
 
@@ -59,6 +65,8 @@ impl Car {
             has_turned: false,
             behavior_code: behavior_code_list[randomized_behavior_code].to_string(),
             waiting_flag: false,
+            car_size: Dimensions { long_edge: 43., short_edge: 33.},
+            radar_size: Dimensions { long_edge: 43., short_edge: 33.},
 
         }
 
@@ -76,6 +84,7 @@ impl Car {
         match &*self.current_direction {
             "West" => self.car_rect.x -= self.current_speed,
             "North" => self.car_rect.y -= self.current_speed,
+            "South" => self.car_rect.y += self.current_speed,
             _ => {}
         };
     }
@@ -109,6 +118,19 @@ impl Car {
                     self.radar.w = 33.;
                 }
             }
+            "South" => {
+                // Update radar rectangle
+                (self.radar.x, self.radar.y) = (self.car_rect.x, self.car_rect.y + self.radar_size.long_edge );
+                for (other_index, other_car) in temp_cars.iter().enumerate() {
+                    if car_index != other_index && self.radar.intersect(other_car.car_rect).is_some() {
+
+
+                    }
+                }
+                (self.radar.w, self.radar.h) = (self.radar_size.short_edge, self.radar_size.long_edge);
+
+
+            }
             _ => {}
         }
     }
@@ -116,29 +138,29 @@ impl Car {
     fn adjust_current_speed(&mut self) {
         if &*self.current_direction == "West" || &*self.current_direction == "East" {
             match self.radar.w {
-                radar_width if radar_width <= 4. => self.current_speed = 0.,
+                //radar_width if radar_width <= 4. => self.current_speed = 0.,
                 radar_width if radar_width <= 10. => {
+                    self.current_speed = self.randomized_initial_speed * 0.;
+                }
+                radar_width if radar_width <= 30. => {
                     self.current_speed = self.randomized_initial_speed * 0.25;
                 }
-                radar_width if radar_width <= 20. => {
-                    self.current_speed = self.randomized_initial_speed * 0.5;
-                }
                 radar_width if radar_width <= 39. => {
-                    self.current_speed = self.randomized_initial_speed * 0.75
+                    self.current_speed = self.randomized_initial_speed * 0.50
                 }
                 _ => self.current_speed = self.randomized_initial_speed,
             }
         } else if &*self.current_direction == "North" || &*self.current_direction == "South" {
             match self.radar.h {
-                radar_height if radar_height <= 4. => self.current_speed = 0.,
+                //radar_height if radar_height <= 4. => self.current_speed = 0.,
                 radar_height if radar_height <= 10. => {
-                    self.current_speed = self.randomized_initial_speed * 0.25;
+                    self.current_speed = self.randomized_initial_speed * 0.;
                 }
                 radar_height if radar_height <= 20. => {
-                    self.current_speed = self.randomized_initial_speed * 0.5;
+                    self.current_speed = self.randomized_initial_speed * 0.25;
                 }
                 radar_height if radar_height <= 39. => {
-                    self.current_speed = self.randomized_initial_speed * 0.75
+                    self.current_speed = self.randomized_initial_speed * 0.50;
                 }
                 _ => self.current_speed = self.randomized_initial_speed,
             }
@@ -162,17 +184,17 @@ impl Car {
                 self.current_direction = "North".to_string();
                 self.has_turned = true;
                 println!("{:?}", self.car_rect);
-
-
         }
+
+
     }
 
     fn turn_left(&mut self, temp_cars: &Vec<Car>) {
-        if self.has_turned == false && self.behavior_code == "RD" && self.car_rect.x <= 600. {
+        if self.has_turned == false && self.behavior_code == "RD" && self.car_rect.x <= 480. {
             self.waiting_flag = true;
             let temp_rect = Rect::new(
-                683.,
-                self.car_rect.y + (self.car_rect.w - self.car_rect.h).abs(),
+                self.car_rect.x,
+                self.car_rect.y,
                 self.car_rect.h,
                 self.car_rect.w
             );
@@ -220,6 +242,10 @@ impl Car {
                     let degree:f32 = 90.;
                     degree.to_radians()
                 },
+                "South" => {
+                    let degree:f32 = 270.;
+                    degree.to_radians()
+                }
                 _ => 0.,
             },
             flip_x: false,
@@ -237,7 +263,6 @@ impl Car {
 #[macroquad::main(conf)]
 async fn main() {
     // Initial game variables
-    let id_counter = 0;
     let mut is_paused = false;
     let cross_road: Texture2D = load_texture("assets/cross-road.png").await.unwrap();
     let car_texture: Texture2D = load_texture("assets/car.png").await.unwrap();
@@ -293,6 +318,7 @@ async fn main() {
 
             let temp_cars = cars.clone();
             cars.iter_mut().for_each(|car| car.turn_if_should(&temp_cars));
+            cars.iter_mut().for_each(|car| car.turn_left(&temp_cars));
 
 
 
