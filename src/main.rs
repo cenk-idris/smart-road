@@ -1,6 +1,9 @@
 use macroquad::{prelude::*, rand::gen_range};
 use macroquad::input::KeyCode::Right;
+
 use uuid::Uuid;
+use std::default::Default;
+
 
 const CAR_SIZE: Vec2 = vec2(43., 33.);
 const RADAR_SIZE: Vec2 = vec2(43., 33.);
@@ -109,8 +112,40 @@ impl Car {
         }
     }
 
+    fn adjust_current_speed(&mut self) {
+        if &*self.current_direction == "West" || &*self.current_direction == "East" {
+            match self.radar.w {
+                radar_width if radar_width <= 4. => self.current_speed = 0.,
+                radar_width if radar_width <= 10. => {
+                    self.current_speed = self.randomized_initial_speed * 0.25;
+                }
+                radar_width if radar_width <= 20. => {
+                    self.current_speed = self.randomized_initial_speed * 0.5;
+                }
+                radar_width if radar_width <= 39. => {
+                    self.current_speed = self.randomized_initial_speed * 0.75
+                }
+                _ => self.current_speed = self.randomized_initial_speed,
+            }
+        } else if &*self.current_direction == "North" || &*self.current_direction == "South" {
+            match self.radar.h {
+                radar_height if radar_height <= 4. => self.current_speed = 0.,
+                radar_height if radar_height <= 10. => {
+                    self.current_speed = self.randomized_initial_speed * 0.25;
+                }
+                radar_height if radar_height <= 20. => {
+                    self.current_speed = self.randomized_initial_speed * 0.5;
+                }
+                radar_height if radar_height <= 39. => {
+                    self.current_speed = self.randomized_initial_speed * 0.75
+                }
+                _ => self.current_speed = self.randomized_initial_speed,
+            }
+        } else {}
+    }
 
-    fn turn_right(&mut self, temp_cars: &Vec<Car>) {
+
+    fn turn_if_should(&mut self, temp_cars: &Vec<Car>) {
         if self.has_turned == false && self.behavior_code == "RU" && self.car_rect.x <= 683. {
             self.waiting_flag = true;
             let temp_rect = Rect::new(
@@ -119,17 +154,38 @@ impl Car {
                 self.car_rect.h,
                 self.car_rect.w
             );
+
+                println!("{:?}", self.car_rect);
+                self.car_rect = temp_rect;
+                self.waiting_flag = false;
+                self.current_direction = "North".to_string();
+                self.has_turned = true;
+                println!("{:?}", self.car_rect);
+
+
+        }
+    }
+
+    fn turn_left(&mut self, temp_cars: &Vec<Car>) {
+        if self.has_turned == false && self.behavior_code == "RD" && self.car_rect.x <= 600. {
+            self.waiting_flag = true;
+            let temp_rect = Rect::new(
+                683.,
+                self.car_rect.y + (self.car_rect.w - self.car_rect.h).abs(),
+                self.car_rect.h,
+                self.car_rect.w
+            );
             println!("{:?}", self.car_rect);
             self.car_rect = temp_rect;
             self.waiting_flag = false;
-            self.current_direction = "North".to_string();
+            self.current_direction = "South".to_string();
             self.has_turned = true;
             println!("{:?}", self.car_rect);
 
         }
     }
 
-    fn draw_all_components(&self) {
+    fn draw_all_components(&self, car_texture: &Texture2D) {
 
         // Draw Radar Rect
         draw_rectangle(
@@ -150,7 +206,25 @@ impl Car {
         );
 
         // Draw Car image top of rect
-        //draw_text_ex()
+
+        draw_texture_ex(car_texture, self.car_rect.x, self.car_rect.y, WHITE, DrawTextureParams {
+            dest_size: Some(vec2(40., 30.)),
+            rotation: match &*self.current_direction {
+
+                "West" => {
+                    let degree:f32 = 0.;
+                    degree.to_radians()
+                },
+                "North" => {
+                    let degree:f32 = 90.;
+                    degree.to_radians()
+                },
+                _ => 0.,
+            },
+            flip_x: false,
+            flip_y: false,
+            ..Default::default()
+        });
 
     }
 
@@ -165,6 +239,7 @@ async fn main() {
     let id_counter = 0;
     let mut is_paused = false;
     let cross_road: Texture2D = load_texture("assets/cross-road.png").await.unwrap();
+    let car_texture: Texture2D = load_texture("assets/car.png").await.unwrap();
     let mut cars: Vec<Car> = Vec::new();
 
     // GAME LOOP
@@ -192,6 +267,14 @@ async fn main() {
             // 2. UPDATE THE STAGE
             // Advances the game simulation one step
             // It runs the AI and game mechanics
+            cars.retain(|car| {
+                if &*car.current_direction == "West" { car.car_rect.x >= 100.}
+                else if &*car.current_direction == "North" { car.car_rect.y >= 100.}
+                else if &*car.current_direction == "South" { car.car_rect.x <= 1100.}
+                else { false }
+            });
+
+            cars.iter_mut().for_each(|car| car.adjust_current_speed());
 
             // a method call, moves the cars one step based on their direction
             cars
@@ -206,24 +289,9 @@ async fn main() {
                 car.update_radar(car_index, &temp_cars);
             }
 
-            for car in &mut cars {
-                match car.radar.w {
-                    radar_width if radar_width <= 4. => car.current_speed = 0.,
-                    radar_width if radar_width <= 10. => {
-                        car.current_speed = car.randomized_initial_speed * 0.25;
-                    }
-                    radar_width if radar_width <= 20. => {
-                        car.current_speed = car.randomized_initial_speed * 0.5;
-                    }
-                    radar_width if radar_width <= 39. => {
-                        car.current_speed = car.randomized_initial_speed * 0.75
-                    }
-                    _ => car.current_speed = car.randomized_initial_speed,
-                }
-            }
 
             let temp_cars = cars.clone();
-            cars.iter_mut().for_each(|car| car.turn_right(&temp_cars));
+            cars.iter_mut().for_each(|car| car.turn_if_should(&temp_cars));
 
 
 
@@ -236,7 +304,7 @@ async fn main() {
             draw_texture(&cross_road, 0., 0., WHITE);
 
             //Draw the car_rect
-            cars.iter().for_each(|car| car.draw_all_components() );
+            cars.iter().for_each(|car| car.draw_all_components(&car_texture) );
         }
 
 
