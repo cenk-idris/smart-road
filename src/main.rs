@@ -120,14 +120,16 @@ impl Car {
             }
             "South" => {
                 // Update radar rectangle
+
                 (self.radar.x, self.radar.y) = (self.car_rect.x, self.car_rect.y + self.radar_size.long_edge );
+                (self.radar.w, self.radar.h) = (self.radar_size.short_edge, self.radar_size.long_edge);
                 for (other_index, other_car) in temp_cars.iter().enumerate() {
                     if car_index != other_index && self.radar.intersect(other_car.car_rect).is_some() {
-
+                        self.radar.h = vec2(self.radar.x, self.radar.y).distance(vec2(other_car.car_rect.x, other_car.car_rect.y)).min(self.radar_size.long_edge)
 
                     }
                 }
-                (self.radar.w, self.radar.h) = (self.radar_size.short_edge, self.radar_size.long_edge);
+
 
 
             }
