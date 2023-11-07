@@ -1,6 +1,5 @@
 use macroquad::{prelude::*, rand::gen_range};
-use macroquad::input::KeyCode::Right;
-// test
+use macroquad::input::KeyCode::{Down, Left, Right, Up};
 use uuid::Uuid;
 use std::default::Default;
 
@@ -43,27 +42,33 @@ struct Car {
 }
 
 impl Car {
-    fn new() -> Self {
+    fn new(randomized_behavior: &str, initial_direction: &str) -> Self {
 
         let random_speed = gen_range(1., 2.);
-        let behavior_code_list = ["RD", "RL", "RU"];
-        let randomized_behavior_code = gen_range(0, 3);
-        let spawning = match behavior_code_list[randomized_behavior_code] {
+        let spawning = match randomized_behavior {
             "RU" => vec2(1050., 495.),
             "RL" => vec2(1050., 535.),
             "RD" => vec2(1050., 574.),
+            "DU" => vec2(643., 1050.),
+            "DL" => vec2(603., 1050.),
+            "DR" => vec2(683., 1050.),
             _ => panic!("Unexpected lane"),
         };
 
         Car {
             uuid: Uuid::new_v4(),
-            car_rect: Rect::new(spawning.x, spawning.y, CAR_SIZE.x, CAR_SIZE.y),
+            car_rect:
+            if initial_direction == "West" || initial_direction == "East" {
+                Rect::new(spawning.x, spawning.y, CAR_SIZE.x, CAR_SIZE.y)
+            } else {
+                Rect::new(spawning.x, spawning.y,CAR_SIZE.y,CAR_SIZE.x)
+            },
             radar: Rect::new(spawning.x - RADAR_SIZE.x, spawning.y, RADAR_SIZE.x, RADAR_SIZE.y),
-            current_direction: "West".to_string(),
+            current_direction: initial_direction.to_string(),
             randomized_initial_speed: random_speed,
             current_speed: random_speed,
             has_turned: false,
-            behavior_code: behavior_code_list[randomized_behavior_code].to_string(),
+            behavior_code: randomized_behavior.to_string(),
             waiting_flag: false,
             car_size: Dimensions { long_edge: 43., short_edge: 33.},
             radar_size: Dimensions { long_edge: 43., short_edge: 33.},
@@ -85,6 +90,7 @@ impl Car {
             "West" => self.car_rect.x -= self.current_speed,
             "North" => self.car_rect.y -= self.current_speed,
             "South" => self.car_rect.y += self.current_speed,
+            "East" => self.car_rect.x += self.current_speed,
             _ => {}
         };
     }
@@ -93,7 +99,9 @@ impl Car {
         match &*self.current_direction {
             "West" => {
                 // Update radar rectangle
-                self.radar.x = self.car_rect.x - RADAR_SIZE.x;
+                (self.radar.x, self.radar.y) = (self.car_rect.x - self.radar_size.long_edge, self.car_rect.y);
+                (self.radar.w, self.radar.h) = (self.radar_size.long_edge, self.radar_size.short_edge);
+
                 // Reposition the radar when intersection occur
                 for (other_index, other_car) in temp_cars.iter().enumerate() {
                     if car_index != other_index && self.radar.intersect(other_car.car_rect).is_some() {
@@ -129,9 +137,20 @@ impl Car {
 
                     }
                 }
+            }
+            "East" => {
+                // Update radar rectangle
+                (self.radar.x, self.radar.y) = (self.car_rect.x + self.car_rect.w, self.car_rect.y);
+                (self.radar.w, self.radar.h) = (self.radar_size.long_edge, self.radar_size.short_edge);
+                for (other_index, other_car) in temp_cars.iter().enumerate() {
+                    if car_index != other_index && self.radar.intersect(other_car.car_rect).is_some() {
 
+                        //self.radar.y = other_car.car_rect.y + other_car.car_rect.h;
+                        self.radar.w = other_car.car_rect.x - (self.car_rect.x + self.car_rect.w);
 
+                    }
 
+                }
             }
             _ => {}
         }
@@ -187,15 +206,10 @@ impl Car {
                 self.has_turned = true;
                 println!("{:?}", self.car_rect);
         }
-
-
-    }
-
-    fn turn_left(&mut self, temp_cars: &Vec<Car>) {
-        if self.has_turned == false && self.behavior_code == "RD" && self.car_rect.x <= 480. {
+        if self.has_turned == false && self.behavior_code == "RD" && self.car_rect.x <= 555. {
             self.waiting_flag = true;
             let temp_rect = Rect::new(
-                self.car_rect.x,
+                555.,
                 self.car_rect.y,
                 self.car_rect.h,
                 self.car_rect.w
@@ -207,6 +221,36 @@ impl Car {
             self.has_turned = true;
             println!("{:?}", self.car_rect);
 
+        }
+        if self.has_turned == false && self.behavior_code == "DR" && self.car_rect.y <= 695. {
+            self.waiting_flag = true;
+            let temp_rect = Rect::new(
+                self.car_rect.x,
+                695.,
+                self.car_rect.h,
+                self.car_rect.w,
+            );
+            println!("{:?}", self.car_rect);
+            self.car_rect = temp_rect;
+            self.waiting_flag = false;
+            self.current_direction = "East".to_string();
+            self.has_turned = true;
+            println!("{:?}", self.car_rect);
+        }
+        if self.has_turned == false && self.behavior_code == "DL" && self.car_rect.y <= 574. {
+            self.waiting_flag = true;
+            let temp_rect = Rect::new(
+                self.car_rect.x - (self.car_rect.h - self.car_rect.w).abs(),
+                574.,
+                self.car_rect.h,
+                self.car_rect.w,
+            );
+            println!("{:?}", self.car_rect);
+            self.car_rect = temp_rect;
+            self.waiting_flag = false;
+            self.current_direction = "West".to_string();
+            self.has_turned = true;
+            println!("{:?}", self.car_rect);
         }
     }
 
@@ -266,7 +310,7 @@ impl Car {
             }
             "East" => {
                 let degree: f32 = 180.;
-                draw_texture_ex(car_texture, self.car_rect.x, self.car_rect.y, WHITE, DrawTextureParams{
+                draw_texture_ex(car_texture, self.car_rect.x + 2., self.car_rect.y + 2., WHITE, DrawTextureParams{
                     dest_size: Some(vec2(40., 30.)),
                     source: None,
                     rotation: degree.to_radians(),
@@ -319,7 +363,20 @@ async fn main() {
 
 
             if is_key_pressed(Right) {
-                let possible_new_car = Car::new();
+                let possible_behaviors = vec!["RU", "RL", "RD"];
+                let possible_new_car = Car::new(possible_behaviors[gen_range(0, 3)], "West");
+                possible_new_car.spawn_if_can(&mut cars);
+            } else if is_key_pressed(Down) {
+                let possible_behaviors = vec!["DU", "DL", "DR"];
+                let possible_new_car = Car::new(possible_behaviors[gen_range(0, 3)], "North");
+                possible_new_car.spawn_if_can(&mut cars);
+            } else if is_key_pressed(Up) {
+                let possible_behaviors = vec!["RU", "RL", "RD"];
+                let possible_new_car = Car::new(possible_behaviors[gen_range(0, 3)], "South");
+                possible_new_car.spawn_if_can(&mut cars);
+            } else if is_key_pressed(Left) {
+                let possible_behaviors = vec!["RU", "RL", "RD"];
+                let possible_new_car = Car::new(possible_behaviors[gen_range(0, 3)], "East");
                 possible_new_car.spawn_if_can(&mut cars);
             }
 
@@ -331,6 +388,7 @@ async fn main() {
                 if &*car.current_direction == "West" { car.car_rect.x >= 100.}
                 else if &*car.current_direction == "North" { car.car_rect.y >= 100.}
                 else if &*car.current_direction == "South" { car.car_rect.y <= 1050.}
+                else if &*car.current_direction == "East" { car.car_rect.x <= 1100. }
                 else { false }
             });
 
@@ -352,7 +410,6 @@ async fn main() {
 
             let temp_cars = cars.clone();
             cars.iter_mut().for_each(|car| car.turn_if_should(&temp_cars));
-            cars.iter_mut().for_each(|car| car.turn_left(&temp_cars));
 
 
             // 3. RENDER / DRAW
