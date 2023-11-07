@@ -229,29 +229,52 @@ impl Car {
         );
 
         // Draw Car image top of rect
-
-        draw_texture_ex(car_texture, self.car_rect.x, self.car_rect.y, WHITE, DrawTextureParams {
-            dest_size: Some(vec2(40., 30.)),
-            rotation: match &*self.current_direction {
-
-                "West" => {
-                    let degree:f32 = 0.;
-                    degree.to_radians()
-                },
-                "North" => {
-                    let degree:f32 = 90.;
-                    degree.to_radians()
-                },
-                "South" => {
-                    let degree:f32 = 270.;
-                    degree.to_radians()
-                }
-                _ => 0.,
-            },
-            flip_x: false,
-            flip_y: false,
-            ..Default::default()
-        });
+        match &*self.current_direction {
+            "West" => {
+                draw_texture_ex(car_texture, self.car_rect.x + 1.5, self.car_rect.y + 1.5, WHITE, DrawTextureParams{
+                    dest_size: Some(vec2(40., 30.)),
+                    source: None,
+                    rotation: 0.,
+                    flip_x: false,
+                    flip_y: false,
+                    pivot: None,
+                })
+            }
+            "North" => {
+                let degree: f32 = 90.;
+                draw_texture_ex(car_texture, self.car_rect.x - 3., self.car_rect.y + 7., WHITE, DrawTextureParams{
+                    dest_size: Some(vec2(40., 30.)),
+                    source: None,
+                    rotation: degree.to_radians(),
+                    flip_x: false,
+                    flip_y: false,
+                    pivot: None,
+                })
+            }
+            "South" => {
+                let degree: f32 = 270.;
+                draw_texture_ex(car_texture, self.car_rect.x - 3., self.car_rect.y + 7., WHITE, DrawTextureParams{
+                    dest_size: Some(vec2(40., 30.)),
+                    source: None,
+                    rotation: degree.to_radians(),
+                    flip_x: false,
+                    flip_y: false,
+                    pivot: None,
+                })
+            }
+            "East" => {
+                let degree: f32 = 180.;
+                draw_texture_ex(car_texture, self.car_rect.x, self.car_rect.y, WHITE, DrawTextureParams{
+                    dest_size: Some(vec2(40., 30.)),
+                    source: None,
+                    rotation: degree.to_radians(),
+                    flip_x: false,
+                    flip_y: false,
+                    pivot: None,
+                })
+            }
+            _ => {}
+        }
 
     }
 
@@ -276,7 +299,16 @@ async fn main() {
         }
 
         if is_paused {
-            draw_text("Game Paused - Press P to continue", 350., 600., 40.0, WHITE);
+            // 3. RENDER / DRAW
+            // Draws the game on the screen
+
+            // Draw the cross roads aka the background
+            draw_texture(&cross_road, 0., 0., WHITE);
+
+            //Draw the car_rect
+            cars.iter().for_each(|car| car.draw_all_components(&car_texture) );
+            // Draw PAUSED TEXT
+            draw_text("Press P to continue", 430., 600., 40., BLACK)
         } else {
 
             // 1. PROCESS INPUT
@@ -296,7 +328,7 @@ async fn main() {
             cars.retain(|car| {
                 if &*car.current_direction == "West" { car.car_rect.x >= 100.}
                 else if &*car.current_direction == "North" { car.car_rect.y >= 100.}
-                else if &*car.current_direction == "South" { car.car_rect.x <= 1100.}
+                else if &*car.current_direction == "South" { car.car_rect.y <= 1050.}
                 else { false }
             });
 
@@ -321,9 +353,6 @@ async fn main() {
             cars.iter_mut().for_each(|car| car.turn_left(&temp_cars));
 
 
-
-
-
             // 3. RENDER / DRAW
             // Draws the game on the screen
 
@@ -332,6 +361,9 @@ async fn main() {
 
             //Draw the car_rect
             cars.iter().for_each(|car| car.draw_all_components(&car_texture) );
+
+
+
         }
 
 
