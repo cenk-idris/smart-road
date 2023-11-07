@@ -23,6 +23,7 @@ fn conf() -> Conf {
 struct Dimensions {
     long_edge: f32,
     short_edge: f32,
+    delta_edge: f32,
 }
 
 #[derive(Clone)]
@@ -52,6 +53,9 @@ impl Car {
             "DU" => vec2(643., 1050.),
             "DL" => vec2(603., 1050.),
             "DR" => vec2(683., 1050.),
+            "LU" => vec2(150., 617.),
+            "LR" => vec2(150., 655.),
+            "LD" => vec2(150., 695.),
             _ => panic!("Unexpected lane"),
         };
 
@@ -70,18 +74,20 @@ impl Car {
             has_turned: false,
             behavior_code: randomized_behavior.to_string(),
             waiting_flag: false,
-            car_size: Dimensions { long_edge: 43., short_edge: 33.},
-            radar_size: Dimensions { long_edge: 43., short_edge: 33.},
+            car_size: Dimensions { long_edge: 43., short_edge: 33., delta_edge: CAR_SIZE.x - CAR_SIZE.y},
+            radar_size: Dimensions { long_edge: 43., short_edge: 33., delta_edge: CAR_SIZE.x - CAR_SIZE.y},
 
         }
 
     }
 
-    fn spawn_if_can(self, cars_ref: &mut Vec<Car>) {
+    fn spawn_if_can(cars_ref: &mut Vec<Car>, randomized_behavior: &str, initial_direction: &str) {
+
+        let possible_new_car = Car::new(randomized_behavior, initial_direction);
         if !cars_ref
                 .iter_mut()
-                .any(|other_car| self.car_rect.intersect(other_car.car_rect).is_some()) {
-            cars_ref.push(self)
+                .any(|other_car| possible_new_car.car_rect.intersect(other_car.car_rect).is_some()) {
+            cars_ref.push(possible_new_car)
         }
     }
 
@@ -174,10 +180,10 @@ impl Car {
         } else if &*self.current_direction == "North" || &*self.current_direction == "South" {
             match self.radar.h {
                 //radar_height if radar_height <= 4. => self.current_speed = 0.,
-                radar_height if radar_height <= 10. => {
-                    self.current_speed = self.randomized_initial_speed * 0.;
-                }
                 radar_height if radar_height <= 20. => {
+                    self.current_speed = 0.;
+                }
+                radar_height if radar_height <= 30. => {
                     self.current_speed = self.randomized_initial_speed * 0.25;
                 }
                 radar_height if radar_height <= 39. => {
@@ -249,6 +255,21 @@ impl Car {
             self.car_rect = temp_rect;
             self.waiting_flag = false;
             self.current_direction = "West".to_string();
+            self.has_turned = true;
+            println!("{:?}", self.car_rect);
+        }
+        if self.has_turned == false && self.behavior_code == "LD" && self.car_rect.x + self.car_size.long_edge >= 510. {
+            self.waiting_flag = false;
+            let temp_rect = Rect::new(
+                self.car_rect.x + self.car_size.delta_edge,
+                self.car_rect.y,
+                self.car_size.short_edge,
+                self.car_size.long_edge,
+            );
+            println!("{:?}", self.car_rect);
+            self.car_rect = temp_rect;
+            self.waiting_flag = false;
+            self.current_direction = "South".to_string();
             self.has_turned = true;
             println!("{:?}", self.car_rect);
         }
@@ -363,21 +384,13 @@ async fn main() {
 
 
             if is_key_pressed(Right) {
-                let possible_behaviors = vec!["RU", "RL", "RD"];
-                let possible_new_car = Car::new(possible_behaviors[gen_range(0, 3)], "West");
-                possible_new_car.spawn_if_can(&mut cars);
+                Car::spawn_if_can(&mut cars, vec!["RU", "RL", "RD"][gen_range(0, 3)], "West");
             } else if is_key_pressed(Down) {
-                let possible_behaviors = vec!["DU", "DL", "DR"];
-                let possible_new_car = Car::new(possible_behaviors[gen_range(0, 3)], "North");
-                possible_new_car.spawn_if_can(&mut cars);
+                Car::spawn_if_can(&mut cars, vec!["DU", "DL", "DR"][gen_range(0, 3)], "North");
             } else if is_key_pressed(Up) {
-                let possible_behaviors = vec!["RU", "RL", "RD"];
-                let possible_new_car = Car::new(possible_behaviors[gen_range(0, 3)], "South");
-                possible_new_car.spawn_if_can(&mut cars);
+                Car::spawn_if_can(&mut cars, vec!["UL", "UD", "UR"][gen_range(0, 3)], "South");
             } else if is_key_pressed(Left) {
-                let possible_behaviors = vec!["RU", "RL", "RD"];
-                let possible_new_car = Car::new(possible_behaviors[gen_range(0, 3)], "East");
-                possible_new_car.spawn_if_can(&mut cars);
+                Car::spawn_if_can(&mut cars, vec!["LU", "LR", "LD"][gen_range(0, 3)], "East");
             }
 
 
@@ -388,7 +401,7 @@ async fn main() {
                 if &*car.current_direction == "West" { car.car_rect.x >= 100.}
                 else if &*car.current_direction == "North" { car.car_rect.y >= 100.}
                 else if &*car.current_direction == "South" { car.car_rect.y <= 1050.}
-                else if &*car.current_direction == "East" { car.car_rect.x <= 1100. }
+                else if &*car.current_direction == "East" { car.car_rect.x + car.car_size.long_edge <= 1100. }
                 else { false }
             });
 
