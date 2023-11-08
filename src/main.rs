@@ -264,7 +264,7 @@ impl Car {
         if self.has_turned == false && self.behavior_code == "LD" && self.car_rect.x + self.car_size.long_edge >= 510. {
             self.waiting_flag = true;
             let temp_rect = Rect::new(
-                510. - self.car_size.delta_edge,
+                510. - (self.car_size.long_edge - self.car_size.delta_edge),
                 self.car_rect.y,
                 self.car_size.short_edge,
                 self.car_size.long_edge,
