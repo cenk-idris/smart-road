@@ -56,6 +56,9 @@ impl Car {
             "LU" => vec2(150., 617.),
             "LR" => vec2(150., 655.),
             "LD" => vec2(150., 695.),
+            "UD" => vec2(516., 100.),
+            "UR" => vec2(558., 100.),
+            "UL" => vec2(477., 100.),
             _ => panic!("Unexpected lane"),
         };
 
@@ -195,7 +198,7 @@ impl Car {
     }
 
 
-    fn turn_if_should(&mut self, temp_cars: &Vec<Car>) {
+    fn turn_if_can(&mut self, temp_cars: &Vec<Car>) {
         if self.has_turned == false && self.behavior_code == "RU" && self.car_rect.x <= 683. {
             self.waiting_flag = true;
             let temp_rect = Rect::new(
@@ -259,9 +262,9 @@ impl Car {
             println!("{:?}", self.car_rect);
         }
         if self.has_turned == false && self.behavior_code == "LD" && self.car_rect.x + self.car_size.long_edge >= 510. {
-            self.waiting_flag = false;
+            self.waiting_flag = true;
             let temp_rect = Rect::new(
-                self.car_rect.x + self.car_size.delta_edge,
+                510. - self.car_size.delta_edge,
                 self.car_rect.y,
                 self.car_size.short_edge,
                 self.car_size.long_edge,
@@ -270,6 +273,52 @@ impl Car {
             self.car_rect = temp_rect;
             self.waiting_flag = false;
             self.current_direction = "South".to_string();
+            self.has_turned = true;
+            println!("{:?}", self.car_rect);
+        }
+        if self.has_turned == false && self.behavior_code == "LU" && self.car_rect.x + self.car_size.delta_edge >= 603. {
+            self.waiting_flag = true;
+            let temp_rect = Rect::new(
+                603.,
+                self.car_rect.y - self.car_size.delta_edge,
+                self.car_size.short_edge,
+                self.car_size.long_edge,
+            );
+            println!("{:?}", self.car_rect);
+            self.car_rect = temp_rect;
+            self.waiting_flag = false;
+            self.current_direction = "North".to_string();
+            self.has_turned = true;
+            println!("{:?}", self.car_rect);
+        }
+        if self.has_turned == false && self.behavior_code == "UL" && self.car_rect.y + self.car_size.long_edge >= 528. {
+            self.waiting_flag = true;
+            let temp_rect = Rect::new(
+                self.car_rect.x - self.car_size.delta_edge,
+                528. - (self.car_size.long_edge - self.car_size.delta_edge),
+                self.car_size.long_edge,
+                self.car_size.short_edge
+            );
+            println!("{:?}", self.car_rect);
+            self.car_rect = temp_rect;
+            self.waiting_flag = false;
+            self.current_direction = "West".to_string();
+            self.has_turned = true;
+            println!("{:?}", self.car_rect);
+
+        }
+        if self.has_turned == false && self.behavior_code == "UR" && self.car_rect.y + self.car_size.long_edge >= 650. {
+            self.waiting_flag = true;
+            let temp_rect = Rect::new(
+                self.car_rect.x,
+                650. - (self.car_size.long_edge - self.car_size.delta_edge),
+                self.car_size.long_edge,
+                self.car_size.short_edge
+            );
+            println!("{:?}", self.car_rect);
+            self.car_rect = temp_rect;
+            self.waiting_flag = false;
+            self.current_direction = "East".to_string();
             self.has_turned = true;
             println!("{:?}", self.car_rect);
         }
@@ -422,7 +471,7 @@ async fn main() {
 
 
             let temp_cars = cars.clone();
-            cars.iter_mut().for_each(|car| car.turn_if_should(&temp_cars));
+            cars.iter_mut().for_each(|car| car.turn_if_can(&temp_cars));
 
 
             // 3. RENDER / DRAW
