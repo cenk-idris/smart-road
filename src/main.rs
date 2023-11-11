@@ -46,7 +46,7 @@ struct Car {
 impl Car {
     fn new(randomized_behavior: &str, initial_direction: &str) -> Self {
 
-        let random_speed = gen_range(1., 2.);
+        let random_speed = gen_range(0.8, 2.);
         let spawning = match randomized_behavior {
             "RU" => vec2(1050., 495.),
             "RL" => vec2(1050., 535.),
@@ -96,14 +96,91 @@ impl Car {
         }
     }
 
-    fn move_one_step_if_no_collide(&mut self, temp_cars: &Vec<Car>) {
-        match &*self.current_direction {
-            "West" => self.car_rect.x -= self.current_speed,
-            "North" => self.car_rect.y -= self.current_speed,
-            "South" => self.car_rect.y += self.current_speed,
-            "East" => self.car_rect.x += self.current_speed,
-            _ => {}
-        };
+    fn communicate_with_intersection(&mut self, cars_ref: &Vec<Car> ,core_intersection: &Rect) {
+        let mut temp_cars = cars_ref.clone();
+        temp_cars.retain(|car| car.uuid != self.uuid);
+        if self.behavior_code == "LR" && self.radar.intersect(*core_intersection).is_some() && self.car_rect.intersect(*core_intersection).is_none() {
+            self.waiting_flag = false;
+            if temp_cars.iter().any(|car| car.behavior_code == "LR" && car.car_rect.intersect(*core_intersection).is_some()) {
+                self.waiting_flag = true;
+            }
+
+        }
+        if self.behavior_code == "LU" && self.radar.intersect(*core_intersection).is_some() && self.car_rect.intersect(*core_intersection).is_none() {
+            self.waiting_flag = false;
+            if temp_cars.iter().any(|car| car.behavior_code == "LU" && car.car_rect.intersect(*core_intersection).is_some()) {
+                self.waiting_flag = true;
+            }
+
+        }
+        if self.behavior_code == "RD" && self.radar.intersect(*core_intersection).is_some() && self.car_rect.intersect(*core_intersection).is_none() {
+            self.waiting_flag = false;
+            if temp_cars.iter().any(|car| car.behavior_code == "RD" && car.car_rect.intersect(*core_intersection).is_some()) {
+                self.waiting_flag = true;
+            }
+
+        }
+        if self.behavior_code == "RL" && self.radar.intersect(*core_intersection).is_some() && self.car_rect.intersect(*core_intersection).is_none() {
+            self.waiting_flag = false;
+            if temp_cars.iter().any(|car| car.behavior_code == "RL" && car.car_rect.intersect(*core_intersection).is_some()) {
+                self.waiting_flag = true;
+            }
+        }
+
+        if self.behavior_code == "UR" && self.radar.intersect(*core_intersection).is_some() && self.car_rect.intersect(*core_intersection).is_none() {
+            self.waiting_flag = false;
+            if temp_cars.iter().any(|car| (car.behavior_code == "UR" || car.behavior_code == "RL") && car.car_rect.intersect(*core_intersection).is_some()) {
+                self.waiting_flag = true;
+            }
+        }
+        if self.behavior_code == "UD" && self.radar.intersect(*core_intersection).is_some() && self.car_rect.intersect(*core_intersection).is_none() {
+            self.waiting_flag = false;
+            if temp_cars.iter().any(|car| (car.behavior_code == "UD" || car.behavior_code == "RL") && car.car_rect.intersect(*core_intersection).is_some()) {
+                self.waiting_flag = true;
+            }
+        }
+
+        if self.behavior_code == "DL" && self.radar.intersect(*core_intersection).is_some() && self.car_rect.intersect(*core_intersection).is_none() {
+            self.waiting_flag = false;
+            if temp_cars.iter().any(|car| (car.behavior_code == "DL" || car.behavior_code == "UR") && car.car_rect.intersect(*core_intersection).is_some()) {
+                self.waiting_flag = true;
+            }
+        }
+        if self.behavior_code == "DU" && self.radar.intersect(*core_intersection).is_some() && self.car_rect.intersect(*core_intersection).is_none() {
+            self.waiting_flag = false;
+            if temp_cars.iter().any(|car| (car.behavior_code == "DU" || car.behavior_code == "LR") && car.car_rect.intersect(*core_intersection).is_some()) {
+                self.waiting_flag = true;
+            }
+        }
+
+
+    }
+
+    fn move_one_step_if_no_collide(&mut self, temp_cars: &mut Vec<Car>) {
+            let mut temp_self_car = self.clone();
+            temp_cars.retain(|car| temp_self_car.uuid != car.uuid);
+
+            match &*self.current_direction {
+                "West" => {
+                    temp_self_car.car_rect.x -= temp_self_car.current_speed;
+                    if temp_cars.iter_mut().all(|car|temp_self_car.car_rect.intersect(car.car_rect).is_none()) {
+                        temp_cars.push(temp_self_car);
+                        self.car_rect.x -= self.current_speed;
+                    }
+                }
+                "North" => {
+                    temp_self_car.car_rect.y -= temp_self_car.current_speed;
+                    if temp_cars.iter_mut().all(|car| temp_self_car.car_rect.intersect(car.car_rect).is_none()) {
+                        temp_cars.push(temp_self_car);
+                        self.car_rect.y -= self.current_speed;
+                    }
+                }
+                "South" => self.car_rect.y += self.current_speed,
+                "East" => self.car_rect.x += self.current_speed,
+                _ => {}
+            };
+
+
     }
 
     fn update_radar(&mut self, car_index: usize, temp_cars: &Vec<Car>) {
@@ -115,25 +192,25 @@ impl Car {
 
                 // Reposition the radar when intersection occur
                 for (other_index, other_car) in temp_cars.iter().enumerate() {
-                    if car_index != other_index && self.radar.intersect(other_car.car_rect).is_some()   {
+                    if car_index != other_index && self.radar.intersect(other_car.car_rect).is_some()  {
 
                         self.radar.x = other_car.car_rect.x + other_car.car_rect.w;
                     }
                     // Update radar width
-                    self.radar.w = vec2(self.radar.x, self.radar.y).distance(vec2(self.car_rect.x, self.car_rect.y)).min(43.);
+                    self.radar.w = (self.car_rect.x - self.radar.x).abs() .min(43.);
                 }
             }
             "North" => {
                 // Update radar rectangle
-                (self.radar.x, self.radar.y) = (self.car_rect.x, self.car_rect.y - RADAR_SIZE.x);
+                (self.radar.x, self.radar.y) = (self.car_rect.x, self.car_rect.y - self.radar_size.long_edge);
                 //Reposition the radar when intersection occur
                 for (other_index, other_car) in temp_cars.iter().enumerate() {
-                    if car_index != other_index && self.radar.intersect(other_car.car_rect).is_some() {
+                    if car_index != other_index && (self.radar.intersect(other_car.car_rect).is_some() || (other_car.behavior_code == "LR" && self.radar.intersect(other_car.radar).is_some())) {
 
                         self.radar.y = other_car.car_rect.y + other_car.car_rect.h;
                     }
                     // Update radar width
-                    self.radar.h = vec2(self.radar.x, self.radar.y).distance(vec2(self.car_rect.x, self.car_rect.y)).min(43.);
+                    self.radar.h = (self.car_rect.y - self.radar.y).abs().min(43.);
                     self.radar.w = 33.;
                 }
             }
@@ -161,10 +238,8 @@ impl Car {
                         self.radar.w = other_car.car_rect.x - (self.car_rect.x + self.car_rect.w);
 
                     }
-                    if car_index != other_index && self.radar.intersect(other_car.radar).is_some() {
-                        self.waiting_flag = true;
-                    } else {
-                        self.waiting_flag = false;
+                    if self.uuid != other_car.uuid && self.radar.intersect(other_car.radar).is_some() && self.car_rect.intersect(other_car.radar).is_none() && other_car.current_direction != "North" {
+                        self.radar.w = other_car.car_rect.x - (self.car_rect.x + self.car_rect.w);
                     }
 
                 }
@@ -177,7 +252,7 @@ impl Car {
         if &*self.current_direction == "West" || &*self.current_direction == "East" {
             match self.radar.w {
                 //radar_width if radar_width <= 4. => self.current_speed = 0.,
-                radar_width if radar_width <= 5. => {
+                radar_width if radar_width <= 3. => {
                     self.current_speed = self.randomized_initial_speed * 0.;
                 }
                 radar_width if radar_width <= 30. => {
@@ -191,10 +266,10 @@ impl Car {
         } else if &*self.current_direction == "North" || &*self.current_direction == "South" {
             match self.radar.h {
                 //radar_height if radar_height <= 4. => self.current_speed = 0.,
-                radar_height if radar_height <= 5. => {
+                radar_height if radar_height <= 3. => {
                     self.current_speed = 0.;
                 }
-                radar_height if radar_height <= 30. => {
+                radar_height if radar_height <= 20. => {
                     self.current_speed = self.randomized_initial_speed * 0.25;
                 }
                 radar_height if radar_height <= 39. => {
@@ -209,19 +284,24 @@ impl Car {
     fn turn_if_can(&mut self, temp_cars: &Vec<Car>) {
         if self.has_turned == false && self.behavior_code == "RU" && self.car_rect.x <= 683. {
             self.waiting_flag = true;
+            let mut clear_to_turn = true;
             let temp_rect = Rect::new(
                 683.,
                 self.car_rect.y - (self.car_rect.w - self.car_rect.h).abs(),
                 self.car_rect.h,
                 self.car_rect.w
             );
-
-                println!("{:?}", self.car_rect);
+            for other_car in temp_cars {
+                if self.uuid != other_car.uuid && (temp_rect.intersect(other_car.car_rect).is_some() || temp_rect.intersect(other_car.car_rect).is_some()) {
+                    clear_to_turn = false;
+                }
+            }
+            if clear_to_turn {
                 self.car_rect = temp_rect;
                 self.waiting_flag = false;
                 self.current_direction = "North".to_string();
                 self.has_turned = true;
-                println!("{:?}", self.car_rect);
+            }
         }
         if self.has_turned == false && self.behavior_code == "RD" && self.car_rect.x <= 555. {
             self.waiting_flag = true;
@@ -233,7 +313,7 @@ impl Car {
                 self.car_rect.w
             );
             for other_car in temp_cars {
-                if self.uuid != other_car.uuid && temp_rect.intersect(other_car.car_rect).is_some() {
+                if self.uuid != other_car.uuid && (temp_rect.intersect(other_car.car_rect).is_some() || temp_rect.intersect(other_car.car_rect).is_some()) {
                 clear_to_turn = false;
                 }
             }
@@ -249,33 +329,49 @@ impl Car {
         }
         if self.has_turned == false && self.behavior_code == "DR" && self.car_rect.y <= 695. {
             self.waiting_flag = true;
+            let mut clear_to_turn = true;
             let temp_rect = Rect::new(
                 self.car_rect.x,
                 695.,
                 self.car_rect.h,
                 self.car_rect.w,
             );
-            println!("{:?}", self.car_rect);
-            self.car_rect = temp_rect;
-            self.waiting_flag = false;
-            self.current_direction = "East".to_string();
-            self.has_turned = true;
-            println!("{:?}", self.car_rect);
+            for other_car in temp_cars {
+                if self.uuid != other_car.uuid && (temp_rect.intersect(other_car.car_rect).is_some() || temp_rect.intersect(other_car.car_rect).is_some()) {
+                    clear_to_turn = false;
+                }
+            }
+            if clear_to_turn {
+                self.car_rect = temp_rect;
+                self.waiting_flag = false;
+                self.current_direction = "East".to_string();
+                self.has_turned = true;
+            }
+
+
         }
         if self.has_turned == false && self.behavior_code == "DL" && self.car_rect.y <= 574. {
             self.waiting_flag = true;
+            let mut clear_to_turn = true;
             let temp_rect = Rect::new(
                 self.car_rect.x - (self.car_rect.h - self.car_rect.w).abs(),
                 574.,
                 self.car_rect.h,
                 self.car_rect.w,
             );
-            println!("{:?}", self.car_rect);
-            self.car_rect = temp_rect;
-            self.waiting_flag = false;
-            self.current_direction = "West".to_string();
-            self.has_turned = true;
-            println!("{:?}", self.car_rect);
+            for other_car in temp_cars {
+                if self.uuid != other_car.uuid && (temp_rect.intersect(other_car.car_rect).is_some() || temp_rect.intersect(other_car.car_rect).is_some()) {
+                    clear_to_turn = false;
+                }
+            }
+            if clear_to_turn {
+                self.car_rect = temp_rect;
+                self.waiting_flag = false;
+                self.current_direction = "West".to_string();
+                self.has_turned = true;
+            }
+
+
         }
         if self.has_turned == false && self.behavior_code == "LD" && self.car_rect.x + self.car_size.long_edge >= 510. {
             self.waiting_flag = true;
@@ -323,50 +419,63 @@ impl Car {
                 self.car_size.long_edge,
                 self.car_size.short_edge
             );
-            println!("{:?}", self.car_rect);
+
             self.car_rect = temp_rect;
             self.waiting_flag = false;
             self.current_direction = "West".to_string();
             self.has_turned = true;
-            println!("{:?}", self.car_rect);
+
 
         }
         if self.has_turned == false && self.behavior_code == "UR" && self.car_rect.y + self.car_size.long_edge >= 650. {
             self.waiting_flag = true;
+            let mut clear_to_turn = true;
             let temp_rect = Rect::new(
                 self.car_rect.x,
                 650. - (self.car_size.long_edge - self.car_size.delta_edge),
                 self.car_size.long_edge,
                 self.car_size.short_edge
             );
-            println!("{:?}", self.car_rect);
-            self.car_rect = temp_rect;
-            self.waiting_flag = false;
-            self.current_direction = "East".to_string();
-            self.has_turned = true;
-            println!("{:?}", self.car_rect);
+            for other_car in temp_cars {
+                if self.uuid != other_car.uuid && (temp_rect.intersect(other_car.car_rect).is_some() || (temp_rect.intersect(other_car.radar).is_some() && other_car.behavior_code == "DL")) {
+                    clear_to_turn = false;
+                }
+            }
+            if clear_to_turn {
+                self.car_rect = temp_rect;
+                self.waiting_flag = false;
+                self.current_direction = "East".to_string();
+                self.has_turned = true;
+            }
+
         }
     }
 
-    fn draw_all_components(&self, car_texture: &Texture2D) {
+    fn draw_all_components(&self, car_texture: &Texture2D, debug: bool) {
 
-        // Draw Radar Rect
-        draw_rectangle(
-            self.radar.x,
-            self.radar.y,
-            self.radar.w,
-            self.radar.h,
-            Color::new(1.0, 0.0, 0.0, 0.1)
-        );
+        if debug {
+            // Draw Radar Rect
+            draw_rectangle(
+                self.radar.x,
+                self.radar.y,
+                self.radar.w,
+                self.radar.h,
+                Color::new(1.0, 0.0, 0.0, 0.1)
+            );
 
-        // Draw Car Rect
-        draw_rectangle(
-            self.car_rect.x,
-            self.car_rect.y,
-            self.car_rect.w,
-            self.car_rect.h,
-            Color::new(0.0, 1.0, 0.0, 0.3)
-        );
+            // Draw Car Rect
+            draw_rectangle(
+                self.car_rect.x,
+                self.car_rect.y,
+                self.car_rect.w,
+                self.car_rect.h,
+                Color::new(0.0, 1.0, 0.0, 0.3)
+            );
+        }
+
+
+
+
 
         // Draw Car image top of rect
         match &*self.current_direction {
@@ -427,16 +536,20 @@ impl Car {
 async fn main() {
     // Initial game variables
     let mut is_paused = false;
+    let mut is_debug_mode = false;
     let cross_road: Texture2D = load_texture("assets/cross-road.png").await.unwrap();
     let car_texture: Texture2D = load_texture("assets/car.png").await.unwrap();
     let mut cars: Vec<Car> = Vec::new();
-    let core_intersection = Rect::new(553., 570., 90., 90.);
+    let core_intersection = Rect::new(503., 520., 180., 180.);
 
     // GAME LOOP
 
     loop {
         if is_key_pressed(KeyCode::P) {
             is_paused = !is_paused;
+        }
+        if is_key_pressed(KeyCode::D) {
+            is_debug_mode = !is_debug_mode;
         }
 
         if is_paused {
@@ -445,10 +558,13 @@ async fn main() {
 
             // Draw the cross roads aka the background
             draw_texture(&cross_road, 0., 0., WHITE);
-            draw_rectangle(core_intersection.x, core_intersection.y, core_intersection.w, core_intersection.h, Color::new(0.5, 0.5, 0., 0.1));
+            if is_debug_mode {
+                draw_rectangle(core_intersection.x, core_intersection.y, core_intersection.w, core_intersection.h, Color::new(0.5, 0.5, 0., 0.1));
+            }
+
 
             //Draw the car_rect
-            cars.iter().for_each(|car| car.draw_all_components(&car_texture) );
+            cars.iter().for_each(|car| car.draw_all_components(&car_texture, is_debug_mode) );
             // Draw PAUSED TEXT
             draw_text("Press P to continue", 430., 600., 40., BLACK)
         } else {
@@ -481,14 +597,17 @@ async fn main() {
                 else { false }
             });
 
+            let mut temp_cars = cars.clone();
+            cars.iter_mut().for_each(| car| car.communicate_with_intersection(&temp_cars, &core_intersection));
+
             cars.iter_mut().for_each(|car| car.adjust_current_speed());
 
             // a method call, moves the cars one step based on their direction
-            let temp_cars = cars.clone();
+            let mut temp_cars = cars.clone();
             cars
                 .iter_mut()
                 .filter(|car| !car.waiting_flag)
-                .for_each(|car| car.move_one_step_if_no_collide(&temp_cars));
+                .for_each(|car| car.move_one_step_if_no_collide(&mut temp_cars));
 
             // a method call to update radar positions after moving the car
 
@@ -507,10 +626,13 @@ async fn main() {
 
             // Draw the cross roads aka the background
             draw_texture(&cross_road, 0., 0., WHITE);
-            draw_rectangle(core_intersection.x, core_intersection.y, core_intersection.w, core_intersection.h, Color::new(0.5, 0.5, 0., 0.1));
+            if is_debug_mode {
+                draw_rectangle(core_intersection.x, core_intersection.y, core_intersection.w, core_intersection.h, Color::new(0.5, 0.5, 0., 0.1));
+            }
+
 
             //Draw the car_rect
-            cars.iter().for_each(|car| car.draw_all_components(&car_texture) );
+            cars.iter().for_each(|car| car.draw_all_components(&car_texture, is_debug_mode) );
 
 
 
