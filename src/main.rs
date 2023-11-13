@@ -2,6 +2,8 @@ use macroquad::{prelude::*, rand::gen_range};
 use macroquad::input::KeyCode::{Down, Left, Right, Up};
 use uuid::Uuid;
 use std::default::Default;
+use std::thread::spawn;
+use std::time::{Duration, Instant};
 
 
 const CAR_SIZE: Vec2 = vec2(43., 33.);
@@ -19,6 +21,14 @@ fn conf() -> Conf {
         ..Default::default()
     }
 }
+
+struct Stats {
+    total_cars: i32,
+    best_time: f32,
+    worst_time: f32,
+    best_velocity: f32,
+    worst_velocity: f32,
+}
 #[derive(Clone)]
 struct Dimensions {
     long_edge: f32,
@@ -29,6 +39,8 @@ struct Dimensions {
 #[derive(Clone)]
 struct Car {
     uuid: Uuid,
+    spawn_point: Vec2,
+    lifetime: Instant,
     car_rect: Rect,
     current_direction: String,
     current_speed: f32,
@@ -40,6 +52,7 @@ struct Car {
     waiting_flag: bool,
     car_size: Dimensions,
     radar_size: Dimensions,
+    dest_point: Vec2,
 
 }
 
@@ -65,6 +78,8 @@ impl Car {
 
         Car {
             uuid: Uuid::new_v4(),
+            lifetime: Instant::now(),
+            spawn_point: spawning,
             car_rect:
             if initial_direction == "West" || initial_direction == "East" {
                 Rect::new(spawning.x, spawning.y, CAR_SIZE.x, CAR_SIZE.y)
@@ -79,9 +94,24 @@ impl Car {
             has_turned: false,
             behavior_code: randomized_behavior.to_string(),
             waiting_flag: false,
+
             car_size: Dimensions { long_edge: 43., short_edge: 33., delta_edge: CAR_SIZE.x - CAR_SIZE.y},
             radar_size: Dimensions { long_edge: 43., short_edge: 33., delta_edge: CAR_SIZE.x - CAR_SIZE.y},
-
+            dest_point: match randomized_behavior {
+                "RU" => vec2(683., 100.),
+                "RL" => vec2(100., 535.),
+                "RD" => vec2(555., 1050.),
+                "DU" => vec2(643., 100.),
+                "DL" => vec2(100., 574.),
+                "DR" => vec2(1057., 695.),
+                "LU" => vec2(593., 100.),
+                "LR" => vec2(1057., 655.),
+                "LD" => vec2(567., 1050.),
+                "UD" => vec2(516., 1050.),
+                "UR" => vec2(1057., 607.),
+                "UL" => vec2(100., 485.),
+                _ => panic!("Unexpected lane"),
+            }
         }
 
     }
@@ -94,6 +124,24 @@ impl Car {
                 .any(|other_car| possible_new_car.car_rect.intersect(other_car.car_rect).is_some()) {
             cars_ref.push(possible_new_car)
         }
+    }
+
+    fn check_for_best_or_worst_time(&self, statistics: &mut Stats) {
+        let temp_time = self.lifetime.elapsed().as_secs_f32();
+        if temp_time < statistics.best_time {
+            statistics.best_time = temp_time;
+        }
+        if temp_time > statistics.worst_time {
+            statistics.worst_time = temp_time;
+        }
+        let temp_velocity = self.spawn_point.distance(self.dest_point) / temp_time;
+        if temp_velocity > statistics.best_velocity {
+            statistics.best_velocity = temp_velocity;
+        }
+        if temp_velocity < statistics.worst_velocity {
+            statistics.worst_velocity = temp_velocity;
+        }
+
     }
 
     fn communicate_with_intersection(&mut self, cars_ref: &Vec<Car> ,core_intersection: &Rect) {
@@ -253,6 +301,7 @@ impl Car {
             match self.radar.w {
                 //radar_width if radar_width <= 4. => self.current_speed = 0.,
                 radar_width if radar_width <= 3. => {
+
                     self.current_speed = self.randomized_initial_speed * 0.;
                 }
                 radar_width if radar_width <= 30. => {
@@ -535,6 +584,15 @@ impl Car {
 #[macroquad::main(conf)]
 async fn main() {
     // Initial game variables
+    let mut statistics: Stats = Stats {
+        total_cars: 0,
+        best_time: 999999999.,
+        worst_time: 0.,
+        best_velocity: 0.,
+        worst_velocity: 999999999.,
+    };
+
+    let mut is_escaped: bool = false;
     let mut is_paused = false;
     let mut is_debug_mode = false;
     let cross_road: Texture2D = load_texture("assets/cross-road.png").await.unwrap();
@@ -545,6 +603,9 @@ async fn main() {
     // GAME LOOP
 
     loop {
+        if is_key_pressed(KeyCode::Escape) {
+            is_escaped = !is_escaped;
+        }
         if is_key_pressed(KeyCode::P) {
             is_paused = !is_paused;
         }
@@ -552,7 +613,15 @@ async fn main() {
             is_debug_mode = !is_debug_mode;
         }
 
-        if is_paused {
+        if is_escaped {
+            draw_text(format!("FPS: {}", get_fps()).as_str(), 100., 100., 32., RED);
+            draw_text("STATISTICS", 500., 250., 46., WHITE);
+            draw_text(format!("Total Cars Arrived: {}", statistics.total_cars.to_string()).as_str(), 450., 300., 32., RED);
+            draw_text(format!("Best Time: {} sec", statistics.best_time.to_string()).as_str(), 450., 350., 32., RED);
+            draw_text(format!("Worst Time: {} sec", statistics.worst_time.to_string()).as_str(), 450., 400., 32., RED);
+            draw_text(format!("Best Velocity: {}", statistics.best_velocity.to_string()).as_str(), 450., 450., 32., RED);
+            draw_text(format!("Worst Velocity: {}", statistics.worst_velocity.to_string()).as_str(), 450., 500., 32., RED);
+        } else if is_paused {
             // 3. RENDER / DRAW
             // Draws the game on the screen
 
@@ -590,11 +659,29 @@ async fn main() {
             // Advances the game simulation one step
             // It runs the AI and game mechanics
             cars.retain(|car| {
-                if &*car.current_direction == "West" { car.car_rect.x >= 100.}
-                else if &*car.current_direction == "North" { car.car_rect.y >= 100.}
-                else if &*car.current_direction == "South" { car.car_rect.y <= 1050.}
-                else if &*car.current_direction == "East" { car.car_rect.x + car.car_size.long_edge <= 1100. }
-                else { false }
+
+                if &*car.current_direction == "West" && car.car_rect.x < 100. {
+                    car.check_for_best_or_worst_time(&mut statistics);
+                    statistics.total_cars += 1;
+                    false
+                    }
+                else if &*car.current_direction == "North" && car.car_rect.y < 100. {
+                    car.check_for_best_or_worst_time(&mut statistics);
+                    statistics.total_cars += 1;
+                    false
+                    }
+                else if &*car.current_direction == "South" && car.car_rect.y > 1050. {
+                    car.check_for_best_or_worst_time(&mut statistics);
+                    statistics.total_cars += 1;
+                    false
+                    }
+                else if &*car.current_direction == "East" && car.car_rect.x + car.car_size.long_edge > 1100.{
+                    car.check_for_best_or_worst_time(&mut statistics);
+                    statistics.total_cars += 1;
+                    false
+                     }
+                else { true }
+
             });
 
             let mut temp_cars = cars.clone();
@@ -634,8 +721,12 @@ async fn main() {
             //Draw the car_rect
             cars.iter().for_each(|car| car.draw_all_components(&car_texture, is_debug_mode) );
 
-
-
+            draw_text(format!("FPS: {}", get_fps()).as_str(), 15., 100., 32., RED);
+            draw_text(format!("Total Cars Arrived: {}", statistics.total_cars.to_string()).as_str(), 15., 150., 32., RED);
+            draw_text(format!("Best Time: {} sec", statistics.best_time.to_string()).as_str(), 15., 200., 32., RED);
+            draw_text(format!("Worst Time: {} sec", statistics.worst_time.to_string()).as_str(), 15., 250., 32., RED);
+            draw_text(format!("Best Velocity: {}", statistics.best_velocity.to_string()).as_str(), 15., 300., 32., RED);
+            draw_text(format!("Worst Velocity: {}", statistics.worst_velocity.to_string()).as_str(), 15., 350., 32., RED);
         }
 
 
