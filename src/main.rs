@@ -2,8 +2,7 @@ use macroquad::{prelude::*, rand::gen_range};
 use macroquad::input::KeyCode::{Down, Left, Right, Up};
 use uuid::Uuid;
 use std::default::Default;
-use std::thread::spawn;
-use std::time::{Duration, Instant};
+use std::time::{Instant};
 
 
 const CAR_SIZE: Vec2 = vec2(43., 33.);
@@ -190,7 +189,7 @@ impl Car {
 
         if self.behavior_code == "DL" && self.radar.intersect(*core_intersection).is_some() && self.car_rect.intersect(*core_intersection).is_none() {
             self.waiting_flag = false;
-            if temp_cars.iter().any(|car| (car.behavior_code == "DL" || car.behavior_code == "UR") && car.car_rect.intersect(*core_intersection).is_some()) {
+            if temp_cars.iter().any(|car| (car.behavior_code == "DL" || car.behavior_code == "UR" || car.behavior_code == "LU") && car.car_rect.intersect(*core_intersection).is_some()) {
                 self.waiting_flag = true;
             }
         }
@@ -644,7 +643,6 @@ async fn main() {
 
 
             if is_key_pressed(Right) {
-                let key =
                 Car::spawn_if_can(&mut cars, vec!["RU", "RL", "RD"][gen_range(0, 3)], "West",);
             } else if is_key_pressed(Down) {
                 Car::spawn_if_can(&mut cars, vec!["DU", "DL", "DR"][gen_range(0, 3)], "North");
