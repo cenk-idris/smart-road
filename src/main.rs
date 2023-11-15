@@ -592,6 +592,7 @@ async fn main() {
     };
 
     let mut is_escaped: bool = false;
+    let mut is_exit: bool = false;
     let mut is_paused = false;
     let mut is_debug_mode = false;
     let cross_road: Texture2D = load_texture("assets/cross-road.png").await.unwrap();
@@ -603,7 +604,12 @@ async fn main() {
 
     loop {
         if is_key_pressed(KeyCode::Escape) {
-            is_escaped = !is_escaped;
+            if is_exit {
+                std::process::exit(0);
+            } else {
+                is_escaped = true;
+                is_exit = true;
+            }
         }
         if is_key_pressed(KeyCode::P) {
             is_paused = !is_paused;
@@ -620,6 +626,7 @@ async fn main() {
             draw_text(format!("Worst Time: {} sec", statistics.worst_time.to_string()).as_str(), 450., 400., 32., RED);
             draw_text(format!("Best Velocity: {}", statistics.best_velocity.to_string()).as_str(), 450., 450., 32., RED);
             draw_text(format!("Worst Velocity: {}", statistics.worst_velocity.to_string()).as_str(), 450., 500., 32., RED);
+            draw_text("At this point there is no return, press Esc to exit as if you have a choice :)", 150., 800., 24., WHITE);
         } else if is_paused {
             // 3. RENDER / DRAW
             // Draws the game on the screen
@@ -642,13 +649,13 @@ async fn main() {
             // has happened since the last call
 
 
-            if is_key_pressed(Right) {
+            if is_key_pressed(Left) {
                 Car::spawn_if_can(&mut cars, vec!["RU", "RL", "RD"][gen_range(0, 3)], "West",);
-            } else if is_key_pressed(Down) {
-                Car::spawn_if_can(&mut cars, vec!["DU", "DL", "DR"][gen_range(0, 3)], "North");
             } else if is_key_pressed(Up) {
+                Car::spawn_if_can(&mut cars, vec!["DU", "DL", "DR"][gen_range(0, 3)], "North");
+            } else if is_key_pressed(Down) {
                 Car::spawn_if_can(&mut cars, vec!["UL", "UD", "UR"][gen_range(0, 3)], "South");
-            } else if is_key_pressed(Left) {
+            } else if is_key_pressed(Right) {
                 Car::spawn_if_can(&mut cars, vec!["LU", "LR", "LD"][gen_range(0, 3)], "East");
             }
 
