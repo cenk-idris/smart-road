@@ -120,7 +120,7 @@ impl Car {
         let possible_new_car = Car::new(randomized_behavior, initial_direction);
         if !cars_ref
                 .iter_mut()
-                .any(|other_car| possible_new_car.car_rect.intersect(other_car.car_rect).is_some()) {
+                .any(|other_car| possible_new_car.car_rect.intersect(other_car.car_rect).is_some()) && cars_ref.len() < 20 {
             cars_ref.push(possible_new_car)
         }
     }
