@@ -1,8 +1,8 @@
 use macroquad::input::KeyCode::{Down, Left, Right, Up};
 use macroquad::{prelude::*, rand::gen_range};
+use std::collections::vec_deque;
 use std::default::Default;
-use std::thread::spawn;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use uuid::Uuid;
 
 const CAR_SIZE: Vec2 = vec2(43., 33.);
@@ -129,7 +129,8 @@ impl Car {
                 .car_rect
                 .intersect(other_car.car_rect)
                 .is_some()
-        }) {
+        }) && cars_ref.len() < 50
+        {
             cars_ref.push(possible_new_car)
         }
     }
@@ -230,7 +231,9 @@ impl Car {
         {
             self.waiting_flag = false;
             if temp_cars.iter().any(|car| {
-                (car.behavior_code == "DL" || car.behavior_code == "UR")
+                (car.behavior_code == "DL"
+                    || car.behavior_code == "UR"
+                    || car.behavior_code == "LU")
                     && car.car_rect.intersect(*core_intersection).is_some()
             }) {
                 self.waiting_flag = true;
@@ -676,7 +679,9 @@ async fn main() {
         worst_velocity: 999999999.,
     };
 
+    let mut random_flag: bool = false;
     let mut is_escaped: bool = false;
+    let mut is_exit: bool = false;
     let mut is_paused = false;
     let mut is_debug_mode = false;
     let cross_road: Texture2D = load_texture("assets/cross-road.png").await.unwrap();
@@ -688,10 +693,18 @@ async fn main() {
 
     loop {
         if is_key_pressed(KeyCode::Escape) {
-            is_escaped = !is_escaped;
+            if is_exit {
+                std::process::exit(0);
+            } else {
+                is_escaped = true;
+                is_exit = true;
+            }
         }
         if is_key_pressed(KeyCode::P) {
             is_paused = !is_paused;
+        }
+        if is_key_pressed(KeyCode::D) {
+            is_debug_mode = !is_debug_mode;
         }
         if is_key_pressed(KeyCode::D) {
             is_debug_mode = !is_debug_mode;
@@ -735,6 +748,13 @@ async fn main() {
                 32.,
                 RED,
             );
+            draw_text(
+                "At this point there is no return, press Esc to exit as if you have a choice :)",
+                150.,
+                800.,
+                24.,
+                WHITE,
+            );
         } else if is_paused {
             // 3. RENDER / DRAW
             // Draws the game on the screen
@@ -761,17 +781,49 @@ async fn main() {
             // Handles any user input that
             // has happened since the last call
 
-            if is_key_pressed(Right) {
-                Car::spawn_if_can(&mut cars, vec!["LU", "LR", "LD"][gen_range(0, 3)], "East");
-            }
-            if is_key_pressed(Down) {
-                Car::spawn_if_can(&mut cars, vec!["UD", "UL", "UR"][gen_range(0, 3)], "South");
-            }
-            if is_key_pressed(Up) {
-                Car::spawn_if_can(&mut cars, vec!["DL", "DU", "DR"][gen_range(0, 3)], "North");
-            }
             if is_key_pressed(Left) {
                 Car::spawn_if_can(&mut cars, vec!["RU", "RL", "RD"][gen_range(0, 3)], "West");
+            } else if is_key_pressed(Up) {
+                Car::spawn_if_can(&mut cars, vec!["DU", "DL", "DR"][gen_range(0, 3)], "North");
+            } else if is_key_pressed(Down) {
+                Car::spawn_if_can(&mut cars, vec!["UL", "UD", "UR"][gen_range(0, 3)], "South");
+            } else if is_key_pressed(Right) {
+                Car::spawn_if_can(&mut cars, vec!["LU", "LR", "LD"][gen_range(0, 3)], "East");
+            } else if is_key_pressed(KeyCode::R) {
+                random_flag = !random_flag;
+            } else if random_flag {
+                let random_direction = vec!["West", "North", "South", "East"][gen_range(0, 4)];
+                match random_direction {
+                    "West" => {
+                        Car::spawn_if_can(
+                            &mut cars,
+                            vec!["RU", "RL", "RD"][gen_range(0, 3)],
+                            random_direction,
+                        );
+                    }
+                    "North" => {
+                        Car::spawn_if_can(
+                            &mut cars,
+                            vec!["DU", "DL", "DR"][gen_range(0, 3)],
+                            random_direction,
+                        );
+                    }
+                    "South" => {
+                        Car::spawn_if_can(
+                            &mut cars,
+                            vec!["UL", "UD", "UR"][gen_range(0, 3)],
+                            random_direction,
+                        );
+                    }
+                    "East" => {
+                        Car::spawn_if_can(
+                            &mut cars,
+                            vec!["LU", "LR", "LD"][gen_range(0, 3)],
+                            random_direction,
+                        );
+                    }
+                    _ => {}
+                }
             }
 
             // 2. UPDATE THE STAGE
