@@ -462,12 +462,10 @@ impl Car {
                 self.car_size.short_edge,
                 self.car_size.long_edge,
             );
-            println!("{:?}", self.car_rect);
             self.car_rect = temp_rect;
             self.waiting_flag = false;
             self.current_direction = "South".to_string();
             self.has_turned = true;
-            println!("{:?}", self.car_rect);
         }
         if self.has_turned == false && self.behavior_code == "LU" && self.car_rect.x + self.car_size.delta_edge >= 603. {
             self.waiting_flag = true;
