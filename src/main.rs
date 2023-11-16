@@ -4,6 +4,8 @@ use std::collections::vec_deque;
 use std::default::Default;
 use std::time::Instant;
 use uuid::Uuid;
+mod stats;
+use stats::*;
 
 const CAR_SIZE: Vec2 = vec2(43., 33.);
 const RADAR_SIZE: Vec2 = vec2(43., 33.);
@@ -17,16 +19,6 @@ fn conf() -> Conf {
         // you can add other option too or use default by
         ..Default::default()
     }
-}
-
-struct Stats {
-    total_cars: i32,
-    best_time: f32,
-    worst_time: f32,
-    best_velocity: f32,
-    worst_velocity: f32,
-    close_calls: i32,
-    collisions: i32,
 }
 #[derive(Clone)]
 struct Dimensions {
@@ -725,63 +717,7 @@ async fn main() {
             is_debug_mode = !is_debug_mode;
         }
         if is_escaped {
-            draw_text(format!("FPS: {}", get_fps()).as_str(), 450., 150., 32., RED);
-            draw_text(
-                format!("Total Cars Arrived: {}", statistics.total_cars.to_string()).as_str(),
-                450.,
-                200.,
-                32.,
-                RED,
-            );
-            draw_text(
-                format!("Best Time: {} sec", statistics.best_time.to_string()).as_str(),
-                450.,
-                250.,
-                32.,
-                RED,
-            );
-            draw_text(
-                format!("Worst Time: {} sec", statistics.worst_time.to_string()).as_str(),
-                450.,
-                300.,
-                32.,
-                RED,
-            );
-            draw_text(
-                format!("Best Velocity: {}", statistics.best_velocity.to_string()).as_str(),
-                450.,
-                350.,
-                32.,
-                RED,
-            );
-            draw_text(
-                format!("Worst Velocity: {}", statistics.worst_velocity.to_string()).as_str(),
-                450.,
-                400.,
-                32.,
-                RED,
-            );
-            draw_text(
-                format!("Close Call: {}", statistics.close_calls.to_string()).as_str(),
-                450.,
-                450.,
-                32.,
-                RED,
-            );
-            draw_text(
-                format!("Collision: {}", statistics.collisions.to_string()).as_str(),
-                450.,
-                500.,
-                32.,
-                RED,
-            );
-            draw_text(
-                "At this point there is no return, press Esc to exit as if you have a choice :)",
-                150.,
-                800.,
-                24.,
-                WHITE,
-            );
+            statistics.draw_endgame();
         } else if is_paused {
             // 3. RENDER / DRAW
             // Draws the game on the screen
@@ -970,56 +906,7 @@ async fn main() {
             cars.iter()
                 .for_each(|car| car.draw_all_components(&car_texture, is_debug_mode));
 
-            draw_text(format!("FPS: {}", get_fps()).as_str(), 15., 50., 32., RED);
-            draw_text(
-                format!("Total Cars Arrived: {}", statistics.total_cars.to_string()).as_str(),
-                15.,
-                100.,
-                32.,
-                RED,
-            );
-            draw_text(
-                format!("Best Time: {} sec", statistics.best_time.to_string()).as_str(),
-                15.,
-                150.,
-                32.,
-                RED,
-            );
-            draw_text(
-                format!("Worst Time: {} sec", statistics.worst_time.to_string()).as_str(),
-                15.,
-                200.,
-                32.,
-                RED,
-            );
-            draw_text(
-                format!("Best Velocity: {}", statistics.best_velocity.to_string()).as_str(),
-                15.,
-                250.,
-                32.,
-                RED,
-            );
-            draw_text(
-                format!("Worst Velocity: {}", statistics.worst_velocity.to_string()).as_str(),
-                15.,
-                300.,
-                32.,
-                RED,
-            );
-            draw_text(
-                format!("Close Call: {}", statistics.close_calls.to_string()).as_str(),
-                15.,
-                350.,
-                32.,
-                RED,
-            );
-            draw_text(
-                format!("Collision: {}", statistics.collisions.to_string()).as_str(),
-                15.,
-                400.,
-                32.,
-                RED,
-            )
+            statistics.draw_ingame();
         }
 
         next_frame().await;
