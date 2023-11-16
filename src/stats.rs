@@ -12,104 +12,91 @@ pub struct Stats {
 
 impl Stats {
     pub fn draw_ingame(&self) {
-        draw_text(format!("FPS: {}", get_fps()).as_str(), 15., 50., 32., RED);
+        draw_text(format!("FPS: {}", get_fps()).as_str(), 15., 100., 32., RED);
         draw_text(
-            format!("Total Cars Arrived: {}", self.total_cars.to_string()).as_str(),
-            15.,
-            100.,
-            32.,
-            RED,
-        );
-        draw_text(
-            format!("Best Time: {} sec", self.best_time.to_string()).as_str(),
+            format!("Total Cars Arrived: {}", self.total_cars).as_str(),
             15.,
             150.,
             32.,
             RED,
         );
         draw_text(
-            format!("Worst Time: {} sec", self.worst_time.to_string()).as_str(),
+            format!("Best Time: {} sec", self.best_time).as_str(),
             15.,
             200.,
             32.,
             RED,
         );
         draw_text(
-            format!("Best Velocity: {}", self.best_velocity.to_string()).as_str(),
+            format!("Worst Time: {} sec", self.worst_time).as_str(),
             15.,
             250.,
             32.,
             RED,
         );
         draw_text(
-            format!("Worst Velocity: {}", self.worst_velocity.to_string()).as_str(),
+            format!("Best Velocity: {}", self.best_velocity).as_str(),
             15.,
             300.,
             32.,
             RED,
         );
         draw_text(
-            format!("Close Call: {}", self.close_calls.to_string()).as_str(),
+            format!("Worst Velocity: {}", self.worst_velocity).as_str(),
             15.,
             350.,
             32.,
             RED,
         );
         draw_text(
-            format!("Collision: {}", self.collisions.to_string()).as_str(),
-            15.,
-            400.,
+            format!("Collision: {}", self.collisions).as_str(),
+            915.,
+            150.,
             32.,
             RED,
-        )
+        );
+        draw_text(
+            format!("Close Calls: {}", self.close_calls).as_str(),
+            915.,
+            200.,
+            32.,
+            RED,
+        );
     }
 
     pub fn draw_endgame(&self) {
-        draw_text(format!("FPS: {}", get_fps()).as_str(), 450., 150., 32., RED);
+        draw_text(format!("FPS: {}", get_fps()).as_str(), 100., 100., 32., RED);
+        draw_text("Statistics", 500., 250., 46., WHITE);
         draw_text(
-            format!("Total Cars Arrived: {}", self.total_cars.to_string()).as_str(),
-            450.,
-            200.,
-            32.,
-            RED,
-        );
-        draw_text(
-            format!("Best Time: {} sec", self.best_time.to_string()).as_str(),
-            450.,
-            250.,
-            32.,
-            RED,
-        );
-        draw_text(
-            format!("Worst Time: {} sec", self.worst_time.to_string()).as_str(),
+            format!("Total Cars Arrived: {}", self.total_cars).as_str(),
             450.,
             300.,
             32.,
             RED,
         );
         draw_text(
-            format!("Best Velocity: {}", self.best_velocity.to_string()).as_str(),
+            format!("Best Time: {} sec", self.best_time).as_str(),
             450.,
             350.,
             32.,
             RED,
         );
         draw_text(
-            format!("Worst Velocity: {}", self.worst_velocity.to_string()).as_str(),
+            format!("Worst Time: {} sec", self.worst_time).as_str(),
             450.,
             400.,
             32.,
             RED,
         );
         draw_text(
-            format!("Close Call: {}", self.close_calls.to_string()).as_str(),
+            format!("Best Velocity: {}", self.best_velocity).as_str(),
             450.,
             450.,
             32.,
             RED,
         );
         draw_text(
-            format!("Collision: {}", self.collisions.to_string()).as_str(),
+            format!("Worst Velocity: {}", self.worst_velocity).as_str(),
             450.,
             500.,
             32.,
@@ -121,6 +108,20 @@ impl Stats {
             800.,
             24.,
             WHITE,
+        );
+        draw_text(
+            format!("Collision: {}", self.collisions).as_str(),
+            850.,
+            300.,
+            32.,
+            RED,
+        );
+        draw_text(
+            format!("Close Calls: {}", self.close_calls).as_str(),
+            850.,
+            350.,
+            32.,
+            RED,
         );
     }
 }

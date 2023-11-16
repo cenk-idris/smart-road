@@ -26,14 +26,14 @@ async fn main() {
         worst_time: 0.,
         best_velocity: 0.,
         worst_velocity: 999999999.,
-        close_calls: 0,
         collisions: 0,
+        close_calls: 0,
     };
 
-    let mut random_flag: bool = false;
     let mut is_escaped: bool = false;
     let mut is_exit: bool = false;
     let mut is_paused = false;
+    let mut is_random = false;
     let mut is_debug_mode = false;
     let cross_road: Texture2D = load_texture("assets/cross-road.png").await.unwrap();
     let car_texture: Texture2D = load_texture("assets/car.png").await.unwrap();
@@ -57,6 +57,7 @@ async fn main() {
         if is_key_pressed(KeyCode::D) {
             is_debug_mode = !is_debug_mode;
         }
+
         if is_escaped {
             statistics.draw_endgame();
         } else if is_paused {
@@ -87,20 +88,15 @@ async fn main() {
 
             if is_key_pressed(Left) {
                 Car::spawn_if_can(&mut cars, vec!["RU", "RL", "RD"][gen_range(0, 3)], "West");
-            }
-            if is_key_pressed(Up) {
+            } else if is_key_pressed(Up) {
                 Car::spawn_if_can(&mut cars, vec!["DU", "DL", "DR"][gen_range(0, 3)], "North");
-            }
-            if is_key_pressed(Down) {
+            } else if is_key_pressed(Down) {
                 Car::spawn_if_can(&mut cars, vec!["UL", "UD", "UR"][gen_range(0, 3)], "South");
-            }
-            if is_key_pressed(Right) {
+            } else if is_key_pressed(Right) {
                 Car::spawn_if_can(&mut cars, vec!["LU", "LR", "LD"][gen_range(0, 3)], "East");
-            }
-            if is_key_pressed(KeyCode::R) {
-                random_flag = !random_flag;
-            }
-            if random_flag {
+            } else if is_key_pressed(KeyCode::R) {
+                is_random = !is_random;
+            } else if is_random {
                 let random_direction = vec!["West", "North", "South", "East"][gen_range(0, 4)];
                 match random_direction {
                     "West" => {
@@ -142,61 +138,33 @@ async fn main() {
                 if &*car.current_direction == "West" && car.car_rect.x < 100. {
                     car.check_for_best_or_worst_time(&mut statistics);
                     statistics.total_cars += 1;
-                    if car.close_calls == 1 {
-                        statistics.close_calls += 1;
-                    }
-                    if car.collisions {
-                        statistics.collisions += 1;
-                    }
                     false
                 } else if &*car.current_direction == "North" && car.car_rect.y < 100. {
                     car.check_for_best_or_worst_time(&mut statistics);
                     statistics.total_cars += 1;
-                    if car.close_calls == 1 {
-                        statistics.close_calls += 1;
-                    }
-                    if car.collisions {
-                        statistics.collisions += 1;
-                    }
                     false
                 } else if &*car.current_direction == "South" && car.car_rect.y > 1050. {
                     car.check_for_best_or_worst_time(&mut statistics);
                     statistics.total_cars += 1;
-                    if car.close_calls == 1 {
-                        statistics.close_calls += 1;
-                    }
-                    if car.collisions {
-                        statistics.collisions += 1;
-                    }
                     false
                 } else if &*car.current_direction == "East"
                     && car.car_rect.x + car.car_size.long_edge > 1100.
                 {
                     car.check_for_best_or_worst_time(&mut statistics);
                     statistics.total_cars += 1;
-                    if car.close_calls == 1 {
-                        statistics.close_calls += 1;
-                    }
-                    if car.collisions {
-                        statistics.collisions += 1;
-                    }
                     false
                 } else {
                     true
                 }
             });
 
+            let mut temp_cars = cars.clone();
+            cars.iter()
+                .for_each(|car| car.check_for_collision(&mut temp_cars, &mut statistics));
+
             let temp_cars = cars.clone();
             cars.iter_mut()
                 .for_each(|car| car.communicate_with_intersection(&temp_cars, &core_intersection));
-
-            cars.iter_mut().for_each(|car| car.adjust_current_speed());
-
-            // a method call, moves the cars one step based on their direction
-            let mut temp_cars = cars.clone();
-            cars.iter_mut()
-                .filter(|car| !car.waiting_flag)
-                .for_each(|car| car.move_one_step_if_no_collide(&mut temp_cars));
 
             // a method call to update radar positions after moving the car
 
@@ -205,28 +173,16 @@ async fn main() {
                 car.update_radar(car_index, &temp_cars);
             }
 
+            cars.iter_mut().for_each(|car| car.adjust_current_speed());
+
+            // a method call, moves the cars one step based on their direction
+            let mut temp_cars = cars.clone();
+            cars.iter_mut()
+                .filter(|car| !car.waiting_flag)
+                .for_each(|car| car.move_one_step_if_no_collide(&mut temp_cars, &mut statistics));
+
             let temp_cars = cars.clone();
             cars.iter_mut().for_each(|car| car.turn_if_can(&temp_cars));
-
-            // check collisions
-            let collision_results: Vec<bool> = cars
-                .iter()
-                .map(|car| {
-                    let other_cars: Vec<_> = cars
-                        .iter()
-                        .filter(|other_car| other_car.uuid != car.uuid)
-                        .collect();
-                    other_cars
-                        .iter()
-                        .any(|other_car| car.collides_with(other_car))
-                })
-                .collect();
-
-            for (car, &collided) in cars.iter_mut().zip(collision_results.iter()) {
-                if collided {
-                    car.collisions = true;
-                }
-            }
 
             // 3. RENDER / DRAW
             // Draws the game on the screen

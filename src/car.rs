@@ -22,8 +22,6 @@ pub struct Car {
     pub car_size: Dimensions,
     pub radar_size: Dimensions,
     pub dest_point: Vec2,
-    pub close_calls: u8,
-    pub collisions: bool,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -32,7 +30,6 @@ pub struct Dimensions {
     pub short_edge: f32,
     pub delta_edge: f32,
 }
-
 impl Car {
     pub fn new(randomized_behavior: &str, initial_direction: &str) -> Self {
         let random_speed = gen_range(0.8, 2.);
@@ -100,13 +97,7 @@ impl Car {
                 "UL" => vec2(100., 485.),
                 _ => panic!("Unexpected lane"),
             },
-            close_calls: 0,
-            collisions: false,
         }
-    }
-
-    pub fn collides_with(&self, other: &Car) -> bool {
-        self.car_rect.intersect(other.car_rect).is_some()
     }
 
     pub fn spawn_if_can(
@@ -120,7 +111,7 @@ impl Car {
                 .car_rect
                 .intersect(other_car.car_rect)
                 .is_some()
-        }) && cars_ref.len() < 20
+        }) && cars_ref.len() < 9999
         {
             cars_ref.push(possible_new_car)
         }
@@ -152,8 +143,7 @@ impl Car {
         {
             self.waiting_flag = false;
             if temp_cars.iter().any(|car| {
-                (car.behavior_code == "LR" || car.behavior_code == "DL")
-                    && car.car_rect.intersect(*core_intersection).is_some()
+                car.behavior_code == "LR" && car.car_rect.intersect(*core_intersection).is_some()
             }) {
                 self.waiting_flag = true;
             }
@@ -223,9 +213,7 @@ impl Car {
         {
             self.waiting_flag = false;
             if temp_cars.iter().any(|car| {
-                (car.behavior_code == "DL"
-                    || car.behavior_code == "UR"
-                    || car.behavior_code == "LU")
+                (car.behavior_code == "DL" || car.behavior_code == "UR")
                     && car.car_rect.intersect(*core_intersection).is_some()
             }) {
                 self.waiting_flag = true;
@@ -245,7 +233,21 @@ impl Car {
         }
     }
 
-    pub fn move_one_step_if_no_collide(&mut self, temp_cars: &mut Vec<Car>) {
+    pub fn check_for_collision(&self, temp_cars: &mut Vec<Car>, statistics: &mut Stats) {
+        temp_cars.retain(|temp_car| temp_car.uuid != self.uuid);
+        if temp_cars
+            .iter()
+            .any(|temp_car| temp_car.car_rect.intersect(self.car_rect).is_some())
+        {
+            statistics.collisions += 1;
+        }
+    }
+
+    pub fn move_one_step_if_no_collide(
+        &mut self,
+        temp_cars: &mut Vec<Car>,
+        statistics: &mut Stats,
+    ) {
         let mut temp_self_car = self.clone();
         temp_cars.retain(|car| temp_self_car.uuid != car.uuid);
 
@@ -258,6 +260,8 @@ impl Car {
                 {
                     temp_cars.push(temp_self_car);
                     self.car_rect.x -= self.current_speed;
+                } else {
+                    statistics.close_calls += 1;
                 }
             }
             "North" => {
@@ -268,10 +272,34 @@ impl Car {
                 {
                     temp_cars.push(temp_self_car);
                     self.car_rect.y -= self.current_speed;
+                } else {
+                    statistics.close_calls += 1;
                 }
             }
-            "South" => self.car_rect.y += self.current_speed,
-            "East" => self.car_rect.x += self.current_speed,
+            "South" => {
+                temp_self_car.car_rect.y += temp_self_car.current_speed;
+                if temp_cars
+                    .iter_mut()
+                    .all(|car| temp_self_car.car_rect.intersect(car.car_rect).is_none())
+                {
+                    temp_cars.push(temp_self_car);
+                    self.car_rect.y += self.current_speed;
+                } else {
+                    statistics.close_calls += 1;
+                }
+            }
+            "East" => {
+                temp_self_car.car_rect.x += temp_self_car.current_speed;
+                if temp_cars
+                    .iter_mut()
+                    .all(|car| temp_self_car.car_rect.intersect(car.car_rect).is_none())
+                {
+                    temp_cars.push(temp_self_car);
+                    self.car_rect.x += self.current_speed;
+                } else {
+                    statistics.close_calls += 1;
+                }
+            }
             _ => {}
         };
     }
@@ -303,9 +331,7 @@ impl Car {
                 //Reposition the radar when intersection occur
                 for (other_index, other_car) in temp_cars.iter().enumerate() {
                     if car_index != other_index
-                        && (self.radar.intersect(other_car.car_rect).is_some()
-                            || (other_car.behavior_code == "LR"
-                                && self.radar.intersect(other_car.radar).is_some()))
+                        && (self.radar.intersect(other_car.car_rect).is_some())
                     {
                         self.radar.y = other_car.car_rect.y + other_car.car_rect.h;
                     }
@@ -360,11 +386,9 @@ impl Car {
     pub fn adjust_current_speed(&mut self) {
         if &*self.current_direction == "West" || &*self.current_direction == "East" {
             match self.radar.w {
+                //radar_width if radar_width <= 4. => self.current_speed = 0.,
                 radar_width if radar_width <= 3. => {
                     self.current_speed = self.randomized_initial_speed * 0.;
-                    if radar_width <= 0.75 && radar_width > 0. {
-                        self.close_calls = 1;
-                    };
                 }
                 radar_width if radar_width <= 30. => {
                     self.current_speed = self.randomized_initial_speed * 0.25;
@@ -379,9 +403,6 @@ impl Car {
                 //radar_height if radar_height <= 4. => self.current_speed = 0.,
                 radar_height if radar_height <= 3. => {
                     self.current_speed = 0.;
-                    if radar_height <= 0.75 && radar_height > 0. {
-                        self.close_calls = 1;
-                    };
                 }
                 radar_height if radar_height <= 20. => {
                     self.current_speed = self.randomized_initial_speed * 0.25;
@@ -391,12 +412,11 @@ impl Car {
                 }
                 _ => self.current_speed = self.randomized_initial_speed,
             }
-        } else {
         }
     }
 
     pub fn turn_if_can(&mut self, temp_cars: &Vec<Car>) {
-        if self.has_turned == false && self.behavior_code == "RU" && self.car_rect.x <= 683. {
+        if !self.has_turned && self.behavior_code == "RU" && self.car_rect.x <= 683. {
             self.waiting_flag = true;
             let mut clear_to_turn = true;
             let temp_rect = Rect::new(
@@ -420,7 +440,7 @@ impl Car {
                 self.has_turned = true;
             }
         }
-        if self.has_turned == false && self.behavior_code == "RD" && self.car_rect.x <= 555. {
+        if !self.has_turned && self.behavior_code == "RD" && self.car_rect.x <= 555. {
             self.waiting_flag = true;
             let mut clear_to_turn = true;
             let temp_rect = Rect::new(555., self.car_rect.y, self.car_rect.h, self.car_rect.w);
@@ -439,7 +459,7 @@ impl Car {
                 self.has_turned = true;
             }
         }
-        if self.has_turned == false && self.behavior_code == "DR" && self.car_rect.y <= 695. {
+        if !self.has_turned && self.behavior_code == "DR" && self.car_rect.y <= 695. {
             self.waiting_flag = true;
             let mut clear_to_turn = true;
             let temp_rect = Rect::new(self.car_rect.x, 695., self.car_rect.h, self.car_rect.w);
@@ -458,7 +478,7 @@ impl Car {
                 self.has_turned = true;
             }
         }
-        if self.has_turned == false && self.behavior_code == "DL" && self.car_rect.y <= 574. {
+        if !self.has_turned && self.behavior_code == "DL" && self.car_rect.y <= 574. {
             self.waiting_flag = true;
             let mut clear_to_turn = true;
             let temp_rect = Rect::new(
@@ -482,7 +502,7 @@ impl Car {
                 self.has_turned = true;
             }
         }
-        if self.has_turned == false
+        if !self.has_turned
             && self.behavior_code == "LD"
             && self.car_rect.x + self.car_size.long_edge >= 510.
         {
@@ -493,14 +513,12 @@ impl Car {
                 self.car_size.short_edge,
                 self.car_size.long_edge,
             );
-            println!("{:?}", self.car_rect);
             self.car_rect = temp_rect;
             self.waiting_flag = false;
             self.current_direction = "South".to_string();
             self.has_turned = true;
-            println!("{:?}", self.car_rect);
         }
-        if self.has_turned == false
+        if !self.has_turned
             && self.behavior_code == "LU"
             && self.car_rect.x + self.car_size.delta_edge >= 603.
         {
@@ -525,7 +543,7 @@ impl Car {
                 self.has_turned = true;
             }
         }
-        if self.has_turned == false
+        if !self.has_turned
             && self.behavior_code == "UL"
             && self.car_rect.y + self.car_size.long_edge >= 528.
         {
@@ -542,7 +560,7 @@ impl Car {
             self.current_direction = "West".to_string();
             self.has_turned = true;
         }
-        if self.has_turned == false
+        if !self.has_turned
             && self.behavior_code == "UR"
             && self.car_rect.y + self.car_size.long_edge >= 650.
         {
