@@ -27,6 +27,8 @@ struct Stats {
     worst_time: f32,
     best_velocity: f32,
     worst_velocity: f32,
+    collisions: i32,
+    close_calls: i32,
 }
 #[derive(Clone)]
 struct Dimensions {
@@ -182,14 +184,14 @@ impl Car {
         }
         if self.behavior_code == "UD" && self.radar.intersect(*core_intersection).is_some() && self.car_rect.intersect(*core_intersection).is_none() {
             self.waiting_flag = false;
-            if temp_cars.iter().any(|car| (car.behavior_code == "UD" || car.behavior_code == "RL" || car.behavior_code == "DL") && car.car_rect.intersect(*core_intersection).is_some()) {
+            if temp_cars.iter().any(|car| (car.behavior_code == "UD" || car.behavior_code == "RL") && car.car_rect.intersect(*core_intersection).is_some()) {
                 self.waiting_flag = true;
             }
         }
 
         if self.behavior_code == "DL" && self.radar.intersect(*core_intersection).is_some() && self.car_rect.intersect(*core_intersection).is_none() {
             self.waiting_flag = false;
-            if temp_cars.iter().any(|car| (car.behavior_code == "DL" || car.behavior_code == "UR" || car.behavior_code == "LU" || car.behavior_code == "LR") && car.car_rect.intersect(*core_intersection).is_some()) {
+            if temp_cars.iter().any(|car| (car.behavior_code == "DL" || car.behavior_code == "UR") && car.car_rect.intersect(*core_intersection).is_some()) {
                 self.waiting_flag = true;
             }
         }
@@ -215,7 +217,7 @@ impl Car {
                         temp_cars.push(temp_self_car);
                         self.car_rect.x -= self.current_speed;
                     } else {
-
+                        statistics.collisions += 1;
                     }
                 }
                 "North" => {
@@ -223,10 +225,29 @@ impl Car {
                     if temp_cars.iter_mut().all(|car| temp_self_car.car_rect.intersect(car.car_rect).is_none()) {
                         temp_cars.push(temp_self_car);
                         self.car_rect.y -= self.current_speed;
+                    } else {
+                        statistics.collisions += 1;
                     }
                 }
-                "South" => self.car_rect.y += self.current_speed,
-                "East" => self.car_rect.x += self.current_speed,
+                "South" => {
+                    temp_self_car.car_rect.y += temp_self_car.current_speed;
+                    if temp_cars.iter_mut().all(|car| temp_self_car.car_rect.intersect(car.car_rect).is_none()) {
+                        temp_cars.push(temp_self_car);
+                        self.car_rect.y += self.current_speed;
+                    } else {
+                        statistics.collisions += 1;
+                    }
+                },
+                "East" => {
+                    temp_self_car.car_rect.x += temp_self_car.current_speed;
+                    if temp_cars.iter_mut().all(|car| temp_self_car.car_rect.intersect(car.car_rect).is_none()) {
+                        temp_cars.push(temp_self_car);
+                        self.car_rect.x += self.current_speed;
+                    } else {
+                        statistics.collisions += 1;
+                    }
+
+                },
                 _ => {}
             };
 
@@ -592,6 +613,8 @@ async fn main() {
         worst_time: 0.,
         best_velocity: 0.,
         worst_velocity: 999999999.,
+        collisions: 0,
+        close_calls: 0,
     };
 
     let mut is_escaped: bool = false;
@@ -631,6 +654,8 @@ async fn main() {
             draw_text(format!("Best Velocity: {}", statistics.best_velocity.to_string()).as_str(), 450., 450., 32., RED);
             draw_text(format!("Worst Velocity: {}", statistics.worst_velocity.to_string()).as_str(), 450., 500., 32., RED);
             draw_text("At this point there is no return, press Esc to exit as if you have a choice :)", 150., 800., 24., WHITE);
+            draw_text(format!("Collision: {}", statistics.collisions.to_string()).as_str(), 850., 300., 32., RED);
+            draw_text(format!("Close Calls: {}", statistics.close_calls.to_string()).as_str(), 850., 350., 32., RED);
         } else if is_paused {
             // 3. RENDER / DRAW
             // Draws the game on the screen
@@ -728,6 +753,8 @@ async fn main() {
 
             });
 
+
+
             let mut temp_cars = cars.clone();
             cars.iter_mut().for_each(| car| car.communicate_with_intersection(&temp_cars, &core_intersection));
 
@@ -773,6 +800,8 @@ async fn main() {
             draw_text(format!("Worst Time: {} sec", statistics.worst_time.to_string()).as_str(), 15., 250., 32., RED);
             draw_text(format!("Best Velocity: {}", statistics.best_velocity.to_string()).as_str(), 15., 300., 32., RED);
             draw_text(format!("Worst Velocity: {}", statistics.worst_velocity.to_string()).as_str(), 15., 350., 32., RED);
+            draw_text(format!("Collision: {}", statistics.collisions.to_string()).as_str(), 915., 150., 32., RED);
+            draw_text(format!("Close Calls: {}", statistics.close_calls.to_string()).as_str(), 915., 200., 32., RED);
         }
 
 
