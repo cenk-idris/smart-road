@@ -120,7 +120,7 @@ impl Car {
         let possible_new_car = Car::new(randomized_behavior, initial_direction);
         if !cars_ref
                 .iter_mut()
-                .any(|other_car| possible_new_car.car_rect.intersect(other_car.car_rect).is_some()) && cars_ref.len() < 20 {
+                .any(|other_car| possible_new_car.car_rect.intersect(other_car.car_rect).is_some()) && cars_ref.len() < 9999 {
             cars_ref.push(possible_new_car)
         }
     }
@@ -182,14 +182,14 @@ impl Car {
         }
         if self.behavior_code == "UD" && self.radar.intersect(*core_intersection).is_some() && self.car_rect.intersect(*core_intersection).is_none() {
             self.waiting_flag = false;
-            if temp_cars.iter().any(|car| (car.behavior_code == "UD" || car.behavior_code == "RL") && car.car_rect.intersect(*core_intersection).is_some()) {
+            if temp_cars.iter().any(|car| (car.behavior_code == "UD" || car.behavior_code == "RL" || car.behavior_code == "DL") && car.car_rect.intersect(*core_intersection).is_some()) {
                 self.waiting_flag = true;
             }
         }
 
         if self.behavior_code == "DL" && self.radar.intersect(*core_intersection).is_some() && self.car_rect.intersect(*core_intersection).is_none() {
             self.waiting_flag = false;
-            if temp_cars.iter().any(|car| (car.behavior_code == "DL" || car.behavior_code == "UR" || car.behavior_code == "LU") && car.car_rect.intersect(*core_intersection).is_some()) {
+            if temp_cars.iter().any(|car| (car.behavior_code == "DL" || car.behavior_code == "UR" || car.behavior_code == "LU" || car.behavior_code == "LR") && car.car_rect.intersect(*core_intersection).is_some()) {
                 self.waiting_flag = true;
             }
         }
@@ -203,8 +203,9 @@ impl Car {
 
     }
 
-    fn move_one_step_if_no_collide(&mut self, temp_cars: &mut Vec<Car>) {
+    fn move_one_step_if_no_collide(&mut self, temp_cars: &mut Vec<Car>, statistics: &mut Stats) {
             let mut temp_self_car = self.clone();
+            let mut currently_colliding = false;
             temp_cars.retain(|car| temp_self_car.uuid != car.uuid);
 
             match &*self.current_direction {
@@ -213,6 +214,8 @@ impl Car {
                     if temp_cars.iter_mut().all(|car|temp_self_car.car_rect.intersect(car.car_rect).is_none()) {
                         temp_cars.push(temp_self_car);
                         self.car_rect.x -= self.current_speed;
+                    } else {
+
                     }
                 }
                 "North" => {
@@ -252,7 +255,7 @@ impl Car {
                 (self.radar.x, self.radar.y) = (self.car_rect.x, self.car_rect.y - self.radar_size.long_edge);
                 //Reposition the radar when intersection occur
                 for (other_index, other_car) in temp_cars.iter().enumerate() {
-                    if car_index != other_index && (self.radar.intersect(other_car.car_rect).is_some() || (other_car.behavior_code == "LR" && self.radar.intersect(other_car.radar).is_some())) {
+                    if car_index != other_index && (self.radar.intersect(other_car.car_rect).is_some()) {
 
                         self.radar.y = other_car.car_rect.y + other_car.car_rect.h;
                     }
@@ -594,6 +597,7 @@ async fn main() {
     let mut is_escaped: bool = false;
     let mut is_exit: bool = false;
     let mut is_paused = false;
+    let mut is_random = false;
     let mut is_debug_mode = false;
     let cross_road: Texture2D = load_texture("assets/cross-road.png").await.unwrap();
     let car_texture: Texture2D = load_texture("assets/car.png").await.unwrap();
@@ -657,6 +661,41 @@ async fn main() {
                 Car::spawn_if_can(&mut cars, vec!["UL", "UD", "UR"][gen_range(0, 3)], "South");
             } else if is_key_pressed(Right) {
                 Car::spawn_if_can(&mut cars, vec!["LU", "LR", "LD"][gen_range(0, 3)], "East");
+            } else if is_key_pressed(KeyCode::R) {
+                is_random = !is_random;
+            } else if is_random {
+                let random_direction = vec!["West", "North", "South", "East"][gen_range(0, 4)];
+                match random_direction {
+                    "West" => {
+                        Car::spawn_if_can(
+                            &mut cars,
+                            vec!["RU", "RL", "RD"][gen_range(0, 3)],
+                            random_direction,
+                        );
+                    }
+                    "North" => {
+                        Car::spawn_if_can(
+                            &mut cars,
+                            vec!["DU", "DL", "DR"][gen_range(0, 3)],
+                            random_direction,
+                        );
+                    }
+                    "South" => {
+                        Car::spawn_if_can(
+                            &mut cars,
+                            vec!["UL", "UD", "UR"][gen_range(0, 3)],
+                            random_direction,
+                        );
+                    }
+                    "East" => {
+                        Car::spawn_if_can(
+                            &mut cars,
+                            vec!["LU", "LR", "LD"][gen_range(0, 3)],
+                            random_direction,
+                        );
+                    }
+                    _ => {}
+                }
             }
 
 
@@ -692,6 +731,13 @@ async fn main() {
             let mut temp_cars = cars.clone();
             cars.iter_mut().for_each(| car| car.communicate_with_intersection(&temp_cars, &core_intersection));
 
+            // a method call to update radar positions after moving the car
+
+            let temp_cars = cars.clone();
+            for (car_index, car) in cars.iter_mut().enumerate() {
+                car.update_radar(car_index, &temp_cars);
+            }
+
             cars.iter_mut().for_each(|car| car.adjust_current_speed());
 
             // a method call, moves the cars one step based on their direction
@@ -699,14 +745,9 @@ async fn main() {
             cars
                 .iter_mut()
                 .filter(|car| !car.waiting_flag)
-                .for_each(|car| car.move_one_step_if_no_collide(&mut temp_cars));
+                .for_each(|car| car.move_one_step_if_no_collide(&mut temp_cars, &mut statistics));
 
-            // a method call to update radar positions after moving the car
 
-            let temp_cars = cars.clone();
-            for (car_index, car) in cars.iter_mut().enumerate() {
-                car.update_radar(car_index, &temp_cars);
-            }
 
 
             let temp_cars = cars.clone();
