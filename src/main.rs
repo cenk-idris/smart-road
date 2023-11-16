@@ -25,6 +25,8 @@ struct Stats {
     worst_time: f32,
     best_velocity: f32,
     worst_velocity: f32,
+    close_calls: i32,
+    collisions: i32,
 }
 #[derive(Clone)]
 struct Dimensions {
@@ -50,6 +52,8 @@ struct Car {
     car_size: Dimensions,
     radar_size: Dimensions,
     dest_point: Vec2,
+    close_calls: u8,
+    collisions: bool,
 }
 
 impl Car {
@@ -119,7 +123,13 @@ impl Car {
                 "UL" => vec2(100., 485.),
                 _ => panic!("Unexpected lane"),
             },
+            close_calls: 0,
+            collisions: false,
         }
+    }
+
+    fn collides_with(&self, other: &Car) -> bool {
+        self.car_rect.intersect(other.car_rect).is_some()
     }
 
     fn spawn_if_can(cars_ref: &mut Vec<Car>, randomized_behavior: &str, initial_direction: &str) {
@@ -129,7 +139,7 @@ impl Car {
                 .car_rect
                 .intersect(other_car.car_rect)
                 .is_some()
-        }) && cars_ref.len() < 50
+        }) && cars_ref.len() < 20
         {
             cars_ref.push(possible_new_car)
         }
@@ -368,9 +378,11 @@ impl Car {
     fn adjust_current_speed(&mut self) {
         if &*self.current_direction == "West" || &*self.current_direction == "East" {
             match self.radar.w {
-                //radar_width if radar_width <= 4. => self.current_speed = 0.,
                 radar_width if radar_width <= 3. => {
                     self.current_speed = self.randomized_initial_speed * 0.;
+                    if radar_width <= 0.75 && radar_width > 0. {
+                        self.close_calls = 1;
+                    };
                 }
                 radar_width if radar_width <= 30. => {
                     self.current_speed = self.randomized_initial_speed * 0.25;
@@ -385,6 +397,9 @@ impl Car {
                 //radar_height if radar_height <= 4. => self.current_speed = 0.,
                 radar_height if radar_height <= 3. => {
                     self.current_speed = 0.;
+                    if radar_height <= 0.75 && radar_height > 0. {
+                        self.close_calls = 1;
+                    };
                 }
                 radar_height if radar_height <= 20. => {
                     self.current_speed = self.randomized_initial_speed * 0.25;
@@ -677,6 +692,8 @@ async fn main() {
         worst_time: 0.,
         best_velocity: 0.,
         worst_velocity: 999999999.,
+        close_calls: 0,
+        collisions: 0,
     };
 
     let mut random_flag: bool = false;
@@ -706,45 +723,54 @@ async fn main() {
         if is_key_pressed(KeyCode::D) {
             is_debug_mode = !is_debug_mode;
         }
-        if is_key_pressed(KeyCode::D) {
-            is_debug_mode = !is_debug_mode;
-        }
-
         if is_escaped {
-            draw_text(format!("FPS: {}", get_fps()).as_str(), 100., 100., 32., RED);
-            draw_text("STATISTICS", 500., 250., 46., WHITE);
+            draw_text(format!("FPS: {}", get_fps()).as_str(), 300., 50., 32., RED);
             draw_text(
                 format!("Total Cars Arrived: {}", statistics.total_cars.to_string()).as_str(),
-                450.,
                 300.,
+                100.,
                 32.,
                 RED,
             );
             draw_text(
                 format!("Best Time: {} sec", statistics.best_time.to_string()).as_str(),
-                450.,
-                350.,
+                300.,
+                150.,
                 32.,
                 RED,
             );
             draw_text(
                 format!("Worst Time: {} sec", statistics.worst_time.to_string()).as_str(),
-                450.,
-                400.,
+                300.,
+                200.,
                 32.,
                 RED,
             );
             draw_text(
                 format!("Best Velocity: {}", statistics.best_velocity.to_string()).as_str(),
-                450.,
-                450.,
+                300.,
+                250.,
                 32.,
                 RED,
             );
             draw_text(
                 format!("Worst Velocity: {}", statistics.worst_velocity.to_string()).as_str(),
-                450.,
-                500.,
+                300.,
+                300.,
+                32.,
+                RED,
+            );
+            draw_text(
+                format!("Close Call: {}", statistics.close_calls.to_string()).as_str(),
+                300.,
+                350.,
+                32.,
+                RED,
+            );
+            draw_text(
+                format!("Collision: {}", statistics.collisions.to_string()).as_str(),
+                300.,
+                400.,
                 32.,
                 RED,
             );
@@ -783,15 +809,20 @@ async fn main() {
 
             if is_key_pressed(Left) {
                 Car::spawn_if_can(&mut cars, vec!["RU", "RL", "RD"][gen_range(0, 3)], "West");
-            } else if is_key_pressed(Up) {
+            }
+            if is_key_pressed(Up) {
                 Car::spawn_if_can(&mut cars, vec!["DU", "DL", "DR"][gen_range(0, 3)], "North");
-            } else if is_key_pressed(Down) {
+            }
+            if is_key_pressed(Down) {
                 Car::spawn_if_can(&mut cars, vec!["UL", "UD", "UR"][gen_range(0, 3)], "South");
-            } else if is_key_pressed(Right) {
+            }
+            if is_key_pressed(Right) {
                 Car::spawn_if_can(&mut cars, vec!["LU", "LR", "LD"][gen_range(0, 3)], "East");
-            } else if is_key_pressed(KeyCode::R) {
+            }
+            if is_key_pressed(KeyCode::R) {
                 random_flag = !random_flag;
-            } else if random_flag {
+            }
+            if random_flag {
                 let random_direction = vec!["West", "North", "South", "East"][gen_range(0, 4)];
                 match random_direction {
                     "West" => {
@@ -833,20 +864,32 @@ async fn main() {
                 if &*car.current_direction == "West" && car.car_rect.x < 100. {
                     car.check_for_best_or_worst_time(&mut statistics);
                     statistics.total_cars += 1;
+                    if car.close_calls == 1 {
+                        statistics.close_calls += 1;
+                    }
                     false
                 } else if &*car.current_direction == "North" && car.car_rect.y < 100. {
                     car.check_for_best_or_worst_time(&mut statistics);
                     statistics.total_cars += 1;
+                    if car.close_calls == 1 {
+                        statistics.close_calls += 1;
+                    }
                     false
                 } else if &*car.current_direction == "South" && car.car_rect.y > 1050. {
                     car.check_for_best_or_worst_time(&mut statistics);
                     statistics.total_cars += 1;
+                    if car.close_calls == 1 {
+                        statistics.close_calls += 1;
+                    }
                     false
                 } else if &*car.current_direction == "East"
                     && car.car_rect.x + car.car_size.long_edge > 1100.
                 {
                     car.check_for_best_or_worst_time(&mut statistics);
                     statistics.total_cars += 1;
+                    if car.close_calls == 1 {
+                        statistics.close_calls += 1;
+                    }
                     false
                 } else {
                     true
@@ -875,6 +918,17 @@ async fn main() {
             let temp_cars = cars.clone();
             cars.iter_mut().for_each(|car| car.turn_if_can(&temp_cars));
 
+            // check collisions
+            let temp_cars = cars.clone();
+            cars.iter_mut().for_each(|car| {
+                if temp_cars
+                    .iter()
+                    .any(|other_car| car.collides_with(other_car))
+                {
+                    car.collisions = true;
+                }
+            });
+
             // 3. RENDER / DRAW
             // Draws the game on the screen
 
@@ -894,42 +948,56 @@ async fn main() {
             cars.iter()
                 .for_each(|car| car.draw_all_components(&car_texture, is_debug_mode));
 
-            draw_text(format!("FPS: {}", get_fps()).as_str(), 15., 100., 32., RED);
+            draw_text(format!("FPS: {}", get_fps()).as_str(), 15., 50., 32., RED);
             draw_text(
                 format!("Total Cars Arrived: {}", statistics.total_cars.to_string()).as_str(),
                 15.,
-                150.,
+                100.,
                 32.,
                 RED,
             );
             draw_text(
                 format!("Best Time: {} sec", statistics.best_time.to_string()).as_str(),
                 15.,
-                200.,
+                150.,
                 32.,
                 RED,
             );
             draw_text(
                 format!("Worst Time: {} sec", statistics.worst_time.to_string()).as_str(),
                 15.,
-                250.,
+                200.,
                 32.,
                 RED,
             );
             draw_text(
                 format!("Best Velocity: {}", statistics.best_velocity.to_string()).as_str(),
                 15.,
-                300.,
+                250.,
                 32.,
                 RED,
             );
             draw_text(
                 format!("Worst Velocity: {}", statistics.worst_velocity.to_string()).as_str(),
                 15.,
+                300.,
+                32.,
+                RED,
+            );
+            draw_text(
+                format!("Close Call: {}", statistics.close_calls.to_string()).as_str(),
+                15.,
                 350.,
                 32.,
                 RED,
             );
+            draw_text(
+                format!("Collision: {}", statistics.collisions.to_string()).as_str(),
+                15.,
+                400.,
+                32.,
+                RED,
+            )
         }
 
         next_frame().await;
