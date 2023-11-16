@@ -111,7 +111,7 @@ impl Car {
                 .car_rect
                 .intersect(other_car.car_rect)
                 .is_some()
-        }) && cars_ref.len() < 9999
+        }) && cars_ref.len() < 50
         {
             cars_ref.push(possible_new_car)
         }
@@ -134,8 +134,8 @@ impl Car {
         }
     }
 
-    pub fn communicate_with_intersection(&mut self, cars_ref: &Vec<Car>, core_intersection: &Rect) {
-        let mut temp_cars = cars_ref.clone();
+    pub fn communicate_with_intersection(&mut self, cars_ref: &[Car], core_intersection: &Rect) {
+        let mut temp_cars = cars_ref.to_owned();
         temp_cars.retain(|car| car.uuid != self.uuid);
         if self.behavior_code == "LR"
             && self.radar.intersect(*core_intersection).is_some()
@@ -304,7 +304,7 @@ impl Car {
         };
     }
 
-    pub fn update_radar(&mut self, car_index: usize, temp_cars: &Vec<Car>) {
+    pub fn update_radar(&mut self, car_index: usize, temp_cars: &[Car]) {
         match &*self.current_direction {
             "West" => {
                 // Update radar rectangle

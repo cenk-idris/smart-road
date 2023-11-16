@@ -135,20 +135,11 @@ async fn main() {
             // Advances the game simulation one step
             // It runs the AI and game mechanics
             cars.retain(|car| {
-                if &*car.current_direction == "West" && car.car_rect.x < 100. {
-                    car.check_for_best_or_worst_time(&mut statistics);
-                    statistics.total_cars += 1;
-                    false
-                } else if &*car.current_direction == "North" && car.car_rect.y < 100. {
-                    car.check_for_best_or_worst_time(&mut statistics);
-                    statistics.total_cars += 1;
-                    false
-                } else if &*car.current_direction == "South" && car.car_rect.y > 1050. {
-                    car.check_for_best_or_worst_time(&mut statistics);
-                    statistics.total_cars += 1;
-                    false
-                } else if &*car.current_direction == "East"
-                    && car.car_rect.x + car.car_size.long_edge > 1100.
+                if &*car.current_direction == "West" && car.car_rect.x < 100.
+                    || &*car.current_direction == "North" && car.car_rect.y < 100.
+                    || &*car.current_direction == "South" && car.car_rect.y > 1050.
+                    || &*car.current_direction == "East"
+                        && car.car_rect.x + car.car_size.long_edge > 1100.
                 {
                     car.check_for_best_or_worst_time(&mut statistics);
                     statistics.total_cars += 1;
