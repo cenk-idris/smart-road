@@ -2,6 +2,7 @@ use macroquad::{prelude::*, rand::gen_range};
 use macroquad::input::KeyCode::{Down, Left, Right, Up};
 use uuid::Uuid;
 use std::default::Default;
+use std::os::macos::raw::stat;
 use std::time::{Instant};
 
 
@@ -205,6 +206,14 @@ impl Car {
 
     }
 
+    fn check_for_collision(&self, temp_cars: &mut Vec<Car>, statistics: &mut Stats) {
+        temp_cars.retain(|temp_car| temp_car.uuid != self.uuid);
+        if temp_cars.iter().any(|temp_car| temp_car.car_rect.intersect(self.car_rect).is_some()) {
+            statistics.collisions += 1;
+        }
+
+    }
+
     fn move_one_step_if_no_collide(&mut self, temp_cars: &mut Vec<Car>, statistics: &mut Stats) {
             let mut temp_self_car = self.clone();
             let mut currently_colliding = false;
@@ -217,7 +226,7 @@ impl Car {
                         temp_cars.push(temp_self_car);
                         self.car_rect.x -= self.current_speed;
                     } else {
-                        statistics.collisions += 1;
+                        statistics.close_calls += 1;
                     }
                 }
                 "North" => {
@@ -226,7 +235,7 @@ impl Car {
                         temp_cars.push(temp_self_car);
                         self.car_rect.y -= self.current_speed;
                     } else {
-                        statistics.collisions += 1;
+                        statistics.close_calls += 1;
                     }
                 }
                 "South" => {
@@ -235,7 +244,7 @@ impl Car {
                         temp_cars.push(temp_self_car);
                         self.car_rect.y += self.current_speed;
                     } else {
-                        statistics.collisions += 1;
+                        statistics.close_calls += 1;
                     }
                 },
                 "East" => {
@@ -244,7 +253,7 @@ impl Car {
                         temp_cars.push(temp_self_car);
                         self.car_rect.x += self.current_speed;
                     } else {
-                        statistics.collisions += 1;
+                        statistics.close_calls += 1;
                     }
 
                 },
@@ -753,7 +762,8 @@ async fn main() {
 
             });
 
-
+            let mut temp_cars = cars.clone();
+            cars.iter().for_each(|car| car.check_for_collision(&mut temp_cars, &mut statistics));
 
             let mut temp_cars = cars.clone();
             cars.iter_mut().for_each(| car| car.communicate_with_intersection(&temp_cars, &core_intersection));
