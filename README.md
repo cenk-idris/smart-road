@@ -125,6 +125,5 @@ Start the app at smart-road/src
   cargo run
 ```
 
-## Screenshots
 
 
