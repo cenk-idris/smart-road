@@ -122,7 +122,7 @@ Go to the project directory
 Start the app at smart-road/src
 
 ```bash
-  cargo run
+  cargo run --release
 ```
 
 
