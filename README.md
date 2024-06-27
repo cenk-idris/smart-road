@@ -3,6 +3,10 @@
 
 A traffic control system for cars entering an intersection application written in Rust
 
+![Smart Road](./assets/smart-roadGif.gif)
+
+PS: Screen recording fps is lowered to create 1 minute long GIF
+
 
 
 ## Instructions
